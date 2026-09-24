@@ -16,7 +16,7 @@
 
   // ---------- mock panel layout (canvas px) ----------
   var P={ name:[662,94,276,30], faceoff:[662,148,82,26], breakout:[750,148,82,26], dzone:[838,148,100,26],
-    set:[662,202,48,26], s1:[716,202,34,26], s2:[756,202,34,26], add:[662,236,134,30], del:[804,236,134,30],
+    set:[662,202,62,26], s1:[744,202,30,26], s2:[790,202,30,26], add:[662,236,134,30], del:[804,236,134,30],
     cap:[662,292,276,56], preview:[662,362,134,38], test:[804,362,134,38], copy:[662,408,276,32] };
   function mid(r){ return [r[0]+r[2]/2, r[1]+r[3]/2]; }
   function rk(p){ return [RX(p[0]),RY(p[1])]; }
@@ -47,7 +47,7 @@
   function lerpPos(a,b,e){ var o={}; for(var k in a) o[k]=[a[k][0]+(b[k][0]-a[k][0])*e, a[k][1]+(b[k][1]-a[k][1])*e]; return o; }
 
   function state(t){
-    var s={ t:t, cursor:cursorAt(t), players:null, ghost:null, step:0, steps:1, tpl:false, name:typed('Win to LW',2.8,4.4,t), cap:'', capLabel:'Setup note', banner:'', toast:'', pressed:null, dragging:null };
+    var s={ t:t, cursor:cursorAt(t), players:null, ghost:null, step:0, steps:1, tpl:false, name:typed('Win to LW',2.8,4.4,t), cap:'', capLabel:'Lineup note', banner:'', toast:'', pressed:null, dragging:null };
     s.scene=SCENES[0][1]; for(var i=0;i<SCENES.length;i++) if(t>=SCENES[i][0]) s.scene=SCENES[i][1];
     if(t>=1.3){ s.tpl=true; s.players=S0; }
     if(t>=5.9){ s.steps=2; s.step=1; s.ghost=S0; s.players=S0; s.capLabel='What happens in step 1'; }
@@ -121,7 +121,7 @@
     c.fillStyle='#15202b'; c.font='800 24px '+FONT; c.textAlign='left'; c.textBaseline='alphabetic'; c.fillText('PLAY DESIGNER',662,64);
     label(c,662,89,'Play name'); field(c,P.name,s.name,s.t>=2.7&&s.t<5.2,'e.g. Win to LW');
     label(c,662,143,'Starting position · faceoff dot'); btn(c,P.faceoff,'Our end ↑','chip',s.tpl); btn(c,P.breakout,'Our end ↓','chip'); btn(c,P.dzone,'📍 Place puck','chip');
-    label(c,662,197,'Steps'); btn(c,P.set,'Set','chip',s.step===0); if(s.steps>1) btn(c,P.s1,'1','chip',s.step===1); if(s.steps>2) btn(c,P.s2,'2','chip',s.step===2);
+    label(c,662,197,'Play timeline'); btn(c,P.set,'Lineup','chip',s.step===0); c.fillStyle='#5b6673'; c.font='700 14px '+FONT; c.textAlign='center'; c.textBaseline='middle'; if(s.steps>1) c.fillText('→',735,215); if(s.steps>2) c.fillText('→',781,215); if(s.steps>1) btn(c,P.s1,'1','chip',s.step===1); if(s.steps>2) btn(c,P.s2,'2','chip',s.step===2);
     btn(c,P.add,s.pressed==='add'?'+ Add step ✓':'+ Add step','plain'); btn(c,P.del,'Delete step','plain');
     label(c,662,287,s.capLabel); field(c,P.cap,s.cap,(s.t>=11.3&&s.t<13.5)||(s.t>=20.3&&s.t<22.4),'What happens in this step…');
     btn(c,P.preview,'▶ Preview','dark'); btn(c,P.test,'Test it','red'); btn(c,P.copy,s.pressed==='copy'||s.t>=30.8?'Link copied ✓':'Copy share link','plain');

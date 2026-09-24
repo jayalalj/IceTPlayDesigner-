@@ -127,6 +127,7 @@
   @media (max-width:760px),(max-height:520px){ .icebar{right:6px;bottom:6px;padding:3px 3px 3px 8px} .icebar>span{font-size:11px} .icebar button{font-size:12px;padding:4px 8px;white-space:nowrap} }
   @media (max-width:760px) and (orientation:portrait){ .icebar .l{display:none} .icebar .s{display:inline} }
   #saveStep[hidden],#saveStart[hidden]{display:none}
+  .tl-arrow{color:var(--muted);font-weight:700;margin:0 -1px}
   .chip.draft{box-shadow:inset 0 0 0 2px var(--accent)}
   .phint{margin-top:4px;color:var(--muted);font-size:13px}
   .linkbtn{border:0;background:none;padding:2px 0;color:var(--blue);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:underline}
@@ -154,7 +155,7 @@
     <div class="field"><div class="k">Play name</div><input type="text" id="name" maxlength="60" placeholder="e.g. D-zone faceoff loss"></div>
     <div><div class="k">Starting position</div><div id="tpl"></div></div>
     <div>
-      <div class="k">Steps</div>
+      <div class="k">Play timeline</div>
       <div class="steps" id="steps"></div>
       <div class="row2" style="margin-top:6px"><button class="btn" id="addStep">+ Add step</button><button class="btn" id="delStep">Delete step</button></div>
     </div>
@@ -344,7 +345,7 @@
     $('saveStep').hidden = !(cur>0 && st.dirty && moved(cur)); $('saveStep').textContent='✓ Save step '+cur;
     $('saveStart').hidden = !(cur===0 && D.setMoved);
     $('capHint').hidden = !(cur>0 && moved(cur) && !st.capEdited); $('regen').hidden = !(cur>0 && moved(cur) && st.capEdited);
-    [...$('steps').children].forEach((c,i)=>c.classList.toggle('draft', i>0 && !!D.steps[i].dirty));
+    [...$('steps').querySelectorAll('.chip')].forEach((c,i)=>c.classList.toggle('draft', i>0 && !!(D.steps[i]&&D.steps[i].dirty)));
   }
   // ---------- automatic step description ----------
   const THEIRS={OC:'their C',OLW:'their LW',ORW:'their RW',OD1:'their D',OD2:'their D'};
@@ -405,9 +406,10 @@
     OURS.forEach(k=>{ $('job-'+k).value=D.jobs[k]||''; }); [...OURS,'G'].forEach(k=>{ $('nm-'+k).value=D.names[k]||''; });
     buildStarts(); buildPuckPath(); showBanner();
     const st=$('steps'); st.innerHTML='';
-    D.steps.forEach((s,i)=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=i===0?'Set':String(i); b.setAttribute('aria-pressed',i===cur); b.onclick=()=>{ cur=i; prevT=-1; sync(); }; st.appendChild(b); });
+    D.steps.forEach((s,i)=>{ if(i){ const ar=document.createElement('span'); ar.className='tl-arrow'; ar.textContent='→'; ar.setAttribute('aria-hidden','true'); st.appendChild(ar); }
+      const b=document.createElement('button'); b.className='chip'; b.textContent=i===0?'Lineup':String(i); b.title=i===0?'Where everyone starts, before the puck moves':'Step '+i; b.setAttribute('aria-pressed',i===cur); b.onclick=()=>{ cur=i; prevT=-1; sync(); }; st.appendChild(b); });
     $('delStep').disabled = cur===0;
-    $('capLabel').textContent = cur===0 ? 'Setup note (before the play starts)' : 'What happens in step '+cur;
+    $('capLabel').textContent = cur===0 ? 'Lineup note (what players read before the play starts)' : 'What happens in step '+cur;
     $('cap').value=D.steps[cur].cap||''; refreshSave();
     const L=lib(), sl=$('lib'); sl.innerHTML=''; const keys=Object.keys(L).sort((a,b)=>L[b].saved-L[a].saved);
     if(!keys.length){ const o=document.createElement('option'); o.textContent='No saved plays yet'; o.value=''; sl.appendChild(o); }

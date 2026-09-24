@@ -125,7 +125,7 @@
     </div>
 
     <div class="cap">
-      <div class="step" id="step">Set</div>
+      <div class="step" id="step">Lineup</div>
       <p id="caption"></p>
       <div class="job" id="job"></div>
     </div>
@@ -297,7 +297,7 @@
   function toVar(p){
     const times=stepTimes(p.steps), dj='Watch the play and follow your arrows. Be in your spot at each step.';
     return { id:'custom', group:'Coach play', name:p.name, house:p.house, setup:p.steps[0].pos, names:p.names||{},
-      caps:p.steps.map((s,i)=>s.cap||(i===0?'Set.':'Step '+i+'.')),
+      caps:p.steps.map((s,i)=>s.cap||(i===0?'Everyone in position.':'Step '+i+'.')),
       jobs:{C:p.jobs.C||dj, LW:p.jobs.LW||dj, RW:p.jobs.RW||dj, LD:p.jobs.LD||dj, RD:p.jobs.RD||dj},
       kf:p.steps.slice(1).map((s,i)=>{ const v=puckVia(p.steps[i].pos.puck,s.pos.puck,s.pk); return v.length?{t:times[i], p:s.pos, via:{puck:v}}:{t:times[i], p:s.pos}; }) };
   }
@@ -358,7 +358,7 @@
   const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   function refreshCaption(){ refreshClip();
     const v=St.v; const i=clamp(St.step,0,NS());
-    $('step').textContent = St.mode==='play' ? 'Playing' : (i===0?'Set':`Step ${i} of ${NS()}`);
+    $('step').textContent = St.mode==='play' ? 'Playing' : (i===0?'Lineup':`Step ${i} of ${NS()}`);
     $('caption').textContent = St.mode==='play' ? (St.countdown>0?'Get set… move as soon as the play starts.':'Go! Be in the right spot at each step.') : v.caps[i];
     $('job').innerHTML = `<b>Your job (${esc(who(sel))}):</b> ${varSel==='random'&&St.mode==='play'?'read the play — which option is it?':v.jobs[sel]}`;
   }
