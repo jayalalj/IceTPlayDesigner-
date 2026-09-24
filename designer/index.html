@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IceT Play Designer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;600&display=swap">
+<style>
+  :root{
+    --bg:#f2f5f8; --panel:#ffffff; --ink:#15202b; --muted:#5b6673; --line:#d5dde6; --chip:#e6ebf1;
+    --accent:#d7263d; --good:#1a9e5c; --bad:#d7263d; --blue:#1f6fd0;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#0f151b; --panel:#182028; --ink:#eef2f6; --muted:#9aa7b4; --line:#2a3541; --chip:#232d38; } }
+  :root[data-theme="dark"]{ --bg:#0f151b; --panel:#182028; --ink:#eef2f6; --muted:#9aa7b4; --line:#2a3541; --chip:#232d38; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Barlow,"Segoe UI",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.35;-webkit-user-select:none;user-select:none}
+  /* one screen: rink on the left, everything else in a panel on the right */
+  .app{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) clamp(260px,26vw,340px);grid-template-areas:"stage panel";gap:10px;padding:10px}
+  .stage{grid-area:stage;position:relative;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;touch-action:none}
+  .stage.playing{cursor:crosshair}
+  canvas{display:block}
+  .banner{position:absolute;left:0;right:0;top:0;padding:8px 14px;text-align:center;pointer-events:none;font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:clamp(20px,2.6vw,32px);text-transform:uppercase;letter-spacing:.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35);background:linear-gradient(rgba(21,32,43,.55),rgba(21,32,43,0));opacity:0;transition:opacity .15s}
+  .banner.show{opacity:1} .banner.good{color:#9df0c0} .banner.bad{color:#ffb3bd}
+  .panel{grid-area:panel;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+  h1{font-family:"Barlow Condensed",Impact,"Arial Narrow",sans-serif;font-weight:800;font-size:28px;letter-spacing:.4px;margin:0;line-height:1;text-transform:uppercase}
+  .hint{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .k{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .chips{display:flex;gap:5px;flex-wrap:wrap}
+  .chip{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:15px;letter-spacing:.3px;text-transform:uppercase;border:0;border-radius:999px;padding:5px 11px;background:var(--chip);color:var(--ink);cursor:pointer}
+  .chip[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+  .chip.pos{min-width:44px}
+  .glabel{flex-basis:100%;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin-top:2px}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .actions .row{grid-column:1/-1;display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px}
+  .btn{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:17px;letter-spacing:.3px;text-transform:uppercase;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;cursor:pointer}
+  .btn.big{font-size:20px;padding:9px 10px}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.dark{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn:focus-visible,.chip:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  .cap{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .cap .step{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-variant-numeric:tabular-nums}
+  .cap p{margin:2px 0 0;font-size:16px;font-weight:600;line-height:1.3}
+  .cap .job{margin-top:5px;font-size:13.5px;color:var(--muted)}
+  .cap .job b{color:var(--ink)}
+  .settings{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;color:var(--muted);font-size:14px}
+  .ctl{display:flex;align-items:center;gap:6px}
+  .ctl input[type=checkbox]{width:17px;height:17px}
+  .ctl input[type=range]{width:100px}
+  .results{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel)}
+  .results[hidden]{display:none}
+  .grade{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:46px;line-height:1;text-align:center;min-width:48px}
+  .grade small{display:block;font-size:12px;letter-spacing:1px;color:var(--muted);font-weight:600}
+  .results ul{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:13px}
+  .results li b{font-family:"Barlow Condensed",sans-serif;font-size:15px;letter-spacing:.3px}
+  .results .ok{color:var(--good)} .results .no{color:var(--bad)}
+  .results .sum{margin-top:4px;color:var(--muted);font-size:12.5px}
+  .clip{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:7px 10px}
+  .clip[hidden]{display:none}
+  .clip .thumb{width:84px;aspect-ratio:16/9;border-radius:6px;background:#000 center/cover no-repeat;position:relative;flex:none;border:0;padding:0;cursor:pointer}
+  .clip .thumb::after{content:"▶";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+  .clip .t{font-size:13px;line-height:1.25;color:var(--muted)} .clip .t b{display:block;color:var(--ink);font-family:"Barlow Condensed",sans-serif;font-size:15px;text-transform:uppercase;letter-spacing:.3px}
+  .clip a{color:var(--blue)}
+  .video{position:absolute;inset:0;background:rgba(10,15,20,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;z-index:5}
+  .video[hidden]{display:none}
+  .video iframe{width:min(100%,calc((100% - 60px)*16/9));aspect-ratio:16/9;max-height:calc(100% - 50px);border:0;border-radius:8px;background:#000}
+  .video .bar{display:flex;gap:10px;align-items:center;color:#fff;font-size:14px}
+  .video .bar a{color:#9fc6ff}
+  details.rules{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:6px 10px;font-size:13px;color:var(--muted)}
+  details.rules summary{cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink)}
+  details.rules ul{margin:6px 0 2px;padding-left:18px;display:grid;gap:4px}
+  details.rules b{color:var(--ink)}
+  /* phones and narrow windows held upright: rink on top, panel underneath */
+  @media (max-width:760px) and (orientation:portrait){
+    .app{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"stage" "panel";gap:8px;padding:8px}
+    .stage{aspect-ratio:1040/745}
+    h1{font-size:22px} .hint{display:none}
+    .btn.big{font-size:18px;padding:8px}
+  }
+  /* phone held sideways: small panel on the right */
+  @media (orientation:landscape) and (max-height:520px){
+    .app{grid-template-columns:minmax(0,1fr) 210px;gap:6px;padding:6px}
+    h1{font-size:18px} .hint{display:none}
+    .chip{font-size:13px;padding:3px 8px} .chip.pos{min-width:34px}
+    .btn{font-size:14px;padding:5px 6px} .btn.big{font-size:16px;padding:6px}
+    .cap p{font-size:13px} .cap .job{font-size:12px}
+    .panel{gap:6px}
+  }
+
+  .home{display:inline-block;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:#1f6fd0;text-decoration:none;margin-bottom:4px}
+  .home:hover{text-decoration:underline}
+</style>
+<style>
+  .field{display:flex;flex-direction:column;gap:3px}
+  .field input[type=text],.field textarea{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--panel);color:var(--ink);width:100%}
+  .field textarea{min-height:64px;resize:vertical}
+  .steps{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+  .steps .chip{min-width:40px}
+  .jobs{display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center;margin-top:6px}
+  .jobs b{font-family:"Barlow Condensed",sans-serif;font-size:15px}
+  .jobs input{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:var(--panel);color:var(--ink)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .note{font-size:13px;color:var(--good);min-height:17px}
+  .lib{display:flex;gap:6px}
+  .lib select{flex:1;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--panel);color:var(--ink)}
+  .stage{cursor:grab} .stage.dragging{cursor:grabbing} .stage.placing{cursor:crosshair}
+  details.box{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:6px 10px;font-size:14px}
+  details.box summary{cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.4px}
+  details.box ol{margin:6px 0 4px;padding-left:18px;color:var(--muted);display:grid;gap:3px}
+  .jobs input.nm{max-width:none}
+  .jobs .jb{grid-column:2}
+  .startgrp{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px}
+  .startgrp .glabel{margin:0 0 1px}
+  .chip.place[aria-pressed="true"]{background:var(--accent);color:#fff}
+  .mine{display:inline-flex;align-items:center;gap:0;border-radius:999px;background:var(--chip)}
+  .mine .chip{background:transparent} .mine .chip[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+  .mine .x{border:0;background:transparent;color:var(--muted);font-size:14px;padding:4px 9px 4px 2px;cursor:pointer;border-radius:999px}
+  .mine .x:hover{color:var(--accent)}
+  .linkbtn{border:0;background:none;padding:2px 0;color:var(--blue);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:underline}
+  .linkbtn[hidden]{display:none}
+  .demo-ov{position:fixed;inset:0;z-index:9996;background:rgba(10,15,20,.7);display:flex;align-items:center;justify-content:center;padding:14px}
+  .demo-ov[hidden]{display:none}
+  .demo-ov .in{width:min(960px,100%);max-height:100%;overflow:auto}
+  .demo-ov .top{display:flex;justify-content:space-between;align-items:center;color:#fff;margin-bottom:8px;font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:20px;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage" id="stage">
+    <canvas id="c" width="1040" height="745"></canvas>
+    <div class="banner" id="banner"></div>
+  </div>
+  <aside class="panel">
+    <div>
+      <a class="home" href="../">← Home</a>
+      <h1>Play Designer</h1>
+      <p class="hint">Drag players and the puck to where they are at the <b>end</b> of each step. Our net is on the left. New here? <a href="../coach-guide/" style="color:var(--blue)">Read the coach guide</a>.</p>
+      <button class="btn" id="demoBtn" style="margin-top:6px;width:100%">▶ Watch the 35-second demo</button>
+    </div>
+    <div class="field"><div class="k">Play name</div><input type="text" id="name" maxlength="60" placeholder="e.g. D-zone faceoff loss"></div>
+    <div><div class="k">Starting position</div><div id="tpl"></div>
+      <button class="linkbtn" id="saveStart" type="button">＋ Save this setup as a starting position</button></div>
+    <div>
+      <div class="k">Steps</div>
+      <div class="steps" id="steps"></div>
+      <div class="row2" style="margin-top:6px"><button class="btn" id="addStep">+ Add step</button><button class="btn" id="delStep">Delete step</button></div>
+    </div>
+    <div class="field"><div class="k" id="capLabel">What happens in this step</div><textarea id="cap" maxlength="220" placeholder="e.g. LD passes up the wall to LW. C swings through the middle."></textarea></div>
+    <label class="ctl"><input type="checkbox" id="house"> Show the house &amp; shot lanes (defense plays)</label>
+    <details class="box" id="playersBox"><summary>Player names &amp; jobs (optional)</summary>
+      <div class="jobs" id="jobs"></div>
+    </details>
+    <div class="actions">
+      <button class="btn dark big" id="preview">▶ Preview</button>
+      <button class="btn primary big" id="test">Test it</button>
+      <div class="row"><button class="btn" id="copy">Copy share link</button><button class="btn" id="save">Save</button><button class="btn" id="newBtn">New</button></div>
+    </div>
+    <div class="note" id="note"></div>
+    <div><div class="k">My saved plays (this device)</div>
+      <div class="lib"><select id="lib"></select><button class="btn" id="load">Open</button><button class="btn" id="del">Delete</button></div>
+    </div>
+    <details class="box"><summary>How it works</summary>
+      <ol>
+        <li>Pick a faceoff dot or a situation, or press <b>📍 Place puck</b> and tap the ice. Drag anyone who isn't where you want them.</li>
+        <li>Press <b>+ Add step</b>, then drag players to where they are at the end of that step. Faded players show where they were.</li>
+        <li>Write one line for each step. That's the caption the kids read.</li>
+        <li><b>Test it</b> opens the play the way the team sees it: Watch, Play it and grading.</li>
+        <li><b>Copy share link</b> and paste it into an email or the team chat. Players open it and play.</li>
+      </ol>
+      <p style="margin:4px 0 2px"><a href="../coach-guide/" style="color:var(--blue);font-weight:600">Full coach guide →</a></p>
+    </details>
+  </aside>
+</div>
+<script>
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const cv=$('c'), ctx=cv.getContext('2d');
+  // rink units ≈ feet. Our net at x=11. We show our zone plus the neutral zone.
+  const VX=134, PADX=2, S=cv.width/VX, ox=PADX*S, oy=5*S;
+  const X=x=>ox+x*S, Y=y=>oy+y*S;
+  const R=9;           // checkpoint radius (ft)
+  const SPD=40;        // how fast you skate (ft per game-second)
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  const ease=t=>t<.5?2*t*t:-1+(4-2*t)*t;
+
+  // ---------- play codec (shared by designer and player) ----------
+  const ORDER=['G','C','LW','RW','LD','RD','OC','OLW','ORW','OD1','OD2','puck'];
+  function encodePlay(p){
+    const o={v:1,n:p.name||'Coach play',h:p.house?1:0,
+      s:p.steps.map(st=>ORDER.flatMap(k=>[Math.round(st.pos[k][0]*2),Math.round(st.pos[k][1]*2)])),
+      c:p.steps.map(s=>s.cap||''), j:p.jobs||{}};
+    const nm={}; Object.entries(p.names||{}).forEach(([k,v])=>{ v=String(v||'').trim(); if(v) nm[k]=v; }); if(Object.keys(nm).length) o.m=nm;
+    return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function decodePlay(str){
+    str=str.replace(/-/g,'+').replace(/_/g,'/'); while(str.length%4) str+='=';
+    const o=JSON.parse(decodeURIComponent(escape(atob(str))));
+    return {name:o.n||'Coach play', house:!!o.h, jobs:o.j||{}, names:o.m||{},
+      steps:o.s.map((a,i)=>({cap:(o.c||[])[i]||'', pos:Object.fromEntries(ORDER.map((k,j)=>[k,[a[2*j]/2,a[2*j+1]/2]]))}))};
+  }
+  function stepTimes(steps){ // seconds for each step, from how far players move
+    let t=0; return steps.slice(1).map((st,i)=>{ const prev=steps[i].pos; let d=0; ORDER.forEach(k=>{ d=Math.max(d,Math.hypot(st.pos[k][0]-prev[k][0],st.pos[k][1]-prev[k][1])); }); t+=Math.max(0.9,d/24); return +t.toFixed(2); });
+  }
+
+  const OURS=['C','LW','RW','LD','RD'], THEM=['OC','OLW','ORW','OD1','OD2'];
+  let sel=null; const St={mode:'design'};
+  // ---------- starting positions ----------
+  // The five faceoff dots you can see on this half of the rink, plus a few common situations.
+  const DOTS=[['fo-dz-top','Our end ↑',[31,22]],['fo-dz-bot','Our end ↓',[31,63]],['fo-nz-top','Neutral ↑',[80,22]],['fo-nz-bot','Neutral ↓',[80,63]],['fo-center','Center ice',[100,42.5]]];
+  const DZ_TOP={ C:[27.5,22], OC:[34.5,22], LW:[29,6.5], ORW:[35,6.5], LD:[18,27], RD:[29,38], OLW:[35,38], RW:[29,47], OD1:[70,14], OD2:[70,52] };
+  const SWAP={C:'C',OC:'OC',LW:'RW',RW:'LW',LD:'RD',RD:'LD',OLW:'ORW',ORW:'OLW',OD1:'OD2',OD2:'OD1'};
+  const r2=v=>Math.round(v*2)/2;
+  function lineup(x,y){ // faceoff lineup around a puck at (x,y)
+    const pos={G:[13,42.5]};
+    if(x<62){ // our end: the coach's D-zone setup, moved to wherever the puck is
+      const top=y<=42.5, dx=x-31, dy=y-(top?22:63);
+      for(const k in DZ_TOP){ const b=DZ_TOP[k], kk=top?k:SWAP[k], by=top?b[1]:85-b[1];
+        pos[kk]= k[1]==='D'&&k[0]==='O' ? [70,by+dy*.5] : [b[0]+dx, by+dy]; }
+    } else { // neutral zone / center ice: centers on the dot, wingers on the hash marks, D behind
+      Object.assign(pos,{ C:[x-4.5,y], OC:[x+4.5,y], LW:[x-3,y-16], RW:[x-3,y+16], ORW:[x+3,y-16], OLW:[x+3,y+16], LD:[x-22,y-13], RD:[x-22,y+13], OD1:[x+22,y-13], OD2:[x+22,y+13] });
+    }
+    // keep everyone on the ice and a little apart
+    const ks=Object.keys(pos), fix=k=>{ let [px,py]=[clamp(pos[k][0],2,132),clamp(pos[k][1],2,83)];
+      const cy=py<24?24:py>61?61:null; if(cy!==null && px<24){ const d=Math.hypot(px-24,py-cy), m=21; if(d>m){ px=24+(px-24)*m/d; py=cy+(py-cy)*m/d; } } // stay inside the rounded corners
+      pos[k]=[px,py]; };
+    ks.forEach(fix);
+    for(let it=0;it<40;it++){ let moved=false;
+      for(let i=0;i<ks.length;i++) for(let j=i+1;j<ks.length;j++){ const a=pos[ks[i]], b=pos[ks[j]]; let d=dist(a,b);
+        if(d<5.5){ let ux=(b[0]-a[0])/(d||1), uy=(b[1]-a[1])/(d||1); if(!d){ ux=0; uy=1; } const push=(5.5-d)/2+.05;
+          if(ks[i]!=='G') pos[ks[i]]=[a[0]-ux*push,a[1]-uy*push]; if(ks[j]!=='G') pos[ks[j]]=[b[0]+ux*push,b[1]+uy*push]; fix(ks[i]); fix(ks[j]); moved=true; } }
+      if(!moved) break; }
+    ks.forEach(k=>{ pos[k]=[r2(pos[k][0]),r2(pos[k][1])]; });
+    pos.puck=[x,y]; fix('puck'); pos.puck=[r2(pos.puck[0]),r2(pos.puck[1])]; return pos;
+  }
+  const TPL={};
+  DOTS.forEach(([id,name,d])=>{ TPL[id]={name, group:'Faceoff dot', pos:lineup(d[0],d[1])}; });
+  Object.assign(TPL,{
+    breakout:{name:'Breakout', group:'Situation', pos:{ G:[13,42.5], puck:[9,11], LD:[26,24], RD:[28,50], C:[46,40], LW:[50,14], RW:[52,62], OC:[40,20], OLW:[52,30], ORW:[70,50], OD1:[100,20], OD2:[100,62] }},
+    dzone:{name:'D-zone coverage', group:'Situation', house:true, pos:{ G:[13,42.5], puck:[14,13], OC:[12,12], OLW:[19,46], ORW:[42,8], OD1:[72,16], OD2:[72,58], LD:[17,17], RD:[16,44], C:[24,30], LW:[58,20], RW:[44,50] }},
+    neutral:{name:'Regroup', group:'Situation', pos:{ G:[13,42.5], puck:[100,42.5], C:[92,42.5], LW:[88,14], RW:[88,71], LD:[70,26], RD:[70,59], OC:[108,42.5], OLW:[112,71], ORW:[112,14], OD1:[128,26], OD2:[128,59] }}
+  });
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  let D, cur=0, drag=null, prevT=-1, note='', placing=false;
+  function fresh(pos,house,start){ return {name:'', house:!!house, jobs:{}, names:{}, start:start||'', steps:[{pos:clone(pos), cap:''}]}; }
+  // storage (this device only)
+  const K_CUR='ipd-current', K_LIB='ipd-designs', K_START='ipd-starts';
+  function jget(k,def){ try{ return JSON.parse(localStorage.getItem(k))||def; }catch(e){ return def; } }
+  function jset(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+  try{ if(!localStorage.getItem(K_LIB) && localStorage.getItem('icet-designs')) localStorage.setItem(K_LIB, localStorage.getItem('icet-designs')); }catch(e){} // bring over plays saved in the old IceT designer
+  function starts(){ return jget(K_START,{}); }
+  function autosave(){ jset(K_CUR,D); }
+  function lib(){ return jget(K_LIB,{}); }
+  function setLib(o){ jset(K_LIB,o); }
+  function say(t){ $('note').textContent=t; }
+
+  // load: link > autosave > template
+  try{ const m=location.hash.match(/p=([^&]+)/); if(m) D=decodePlay(m[1]); }catch(e){}
+  if(!D) D=jget(K_CUR,null);
+  if(!D||!D.steps) D=fresh(TPL['fo-dz-top'].pos,false,'fo-dz-top');
+  D.names=D.names||{}; D.jobs=D.jobs||{};
+
+  // ---------- UI ----------
+  function okToRestart(what){ return D.steps.length<2 || window.confirm('Start over from "'+what+'"? This clears your steps.'); }
+  function useStart(pos,house,start,label){ if(!okToRestart(label)) return false;
+    const keep={name:D.name, names:D.names, jobs:D.jobs}; D=fresh(pos,house,start); Object.assign(D,keep); cur=0; placing=false; sync(); return true; }
+  function chip(label,pressed,onclick){ const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=label; b.setAttribute('aria-pressed',!!pressed); b.onclick=onclick; return b; }
+  function buildStarts(){
+    const box=$('tpl'); box.innerHTML='';
+    const grp=(label)=>{ const g=document.createElement('div'); g.className='startgrp'; const l=document.createElement('div'); l.className='glabel'; l.textContent=label; g.appendChild(l); box.appendChild(g); return g; };
+    let g=grp('Faceoff dot'); DOTS.forEach(([id,name])=>g.appendChild(chip(name,D.start===id,()=>{ if(useStart(TPL[id].pos,false,id,name)) say('Faceoff lineup set. Drag anyone you want somewhere else.'); })));
+    g=grp('Situation'); ['breakout','dzone','neutral'].forEach(id=>g.appendChild(chip(TPL[id].name,D.start===id,()=>useStart(TPL[id].pos,TPL[id].house,id,TPL[id].name))));
+    const pl=chip('📍 Place puck',placing,()=>{ placing=!placing; if(placing){ say('Tap the ice where the puck starts. Players line up around it.'); } else say(''); buildStarts(); showBanner(); }); pl.classList.add('place'); g.appendChild(pl);
+    const M=starts(), ids=Object.keys(M).sort((a,b)=>M[a].saved-M[b].saved);
+    if(ids.length){ g=grp('My starting positions');
+      ids.forEach(id=>{ const w=document.createElement('span'); w.className='mine';
+        w.appendChild(chip(M[id].name,D.start===id,()=>useStart(M[id].pos,M[id].house,id,M[id].name)));
+        const x=document.createElement('button'); x.type='button'; x.className='x'; x.textContent='✕'; x.title='Delete "'+M[id].name+'"'; x.setAttribute('aria-label','Delete starting position '+M[id].name);
+        x.onclick=()=>{ if(!window.confirm('Delete the starting position "'+M[id].name+'" from this device?')) return; const A=starts(); delete A[id]; jset(K_START,A); if(D.start===id) D.start=''; buildStarts(); };
+        w.appendChild(x); g.appendChild(w); }); }
+  }
+  function showBanner(){ $('stage').classList.toggle('placing',placing); if(placing && prevT<0){ $('banner').textContent='Tap where the puck starts'; $('banner').className='banner show'; } else if(prevT<0) $('banner').className='banner'; }
+  $('saveStart').onclick=()=>{
+    const nm=window.prompt('Name this starting position (e.g. "Their dump-in, left corner"):', D.start&&starts()[D.start]?starts()[D.start].name:'');
+    if(nm===null) return; const name=nm.trim().slice(0,30); if(!name){ say('Give it a name so you can find it later.'); return; }
+    const A=starts(); let id=Object.keys(A).find(k=>A[k].name.toLowerCase()===name.toLowerCase()) || ('s'+Date.now());
+    A[id]={name, saved:Date.now(), house:!!D.house, pos:clone(D.steps[0].pos)}; jset(K_START,A); D.start=id; buildStarts(); autosave();
+    say('Saved "'+name+'" under My starting positions (this device).'); };
+  [...OURS,'G'].forEach(k=>{ const l=document.createElement('b'); l.textContent=k;
+    const n=document.createElement('input'); n.id='nm-'+k; n.className='nm'; n.maxLength=14; n.placeholder=(k==='G'?'Goalie':'Player')+' name (optional)'; n.setAttribute('aria-label',k+' player name');
+    n.oninput=()=>{ D.names[k]=n.value; autosave(); };
+    $('jobs').append(l,n);
+    if(k!=='G'){ const i=document.createElement('input'); i.id='job-'+k; i.className='jb'; i.maxLength=140; i.placeholder=k+"'s job in this play"; i.setAttribute('aria-label',k+' job');
+      i.oninput=()=>{ D.jobs[k]=i.value; autosave(); }; $('jobs').append(i); } });
+  function sync(){
+    $('name').value=D.name||''; $('house').checked=!!D.house;
+    OURS.forEach(k=>{ $('job-'+k).value=D.jobs[k]||''; }); [...OURS,'G'].forEach(k=>{ $('nm-'+k).value=D.names[k]||''; });
+    buildStarts(); $('saveStart').hidden = cur!==0; showBanner();
+    const st=$('steps'); st.innerHTML='';
+    D.steps.forEach((s,i)=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=i===0?'Set':String(i); b.setAttribute('aria-pressed',i===cur); b.onclick=()=>{ cur=i; prevT=-1; sync(); }; st.appendChild(b); });
+    $('delStep').disabled = cur===0;
+    $('capLabel').textContent = cur===0 ? 'Setup note (before the play starts)' : 'What happens in step '+cur;
+    $('cap').value=D.steps[cur].cap||'';
+    const L=lib(), sl=$('lib'); sl.innerHTML=''; const keys=Object.keys(L).sort((a,b)=>L[b].saved-L[a].saved);
+    if(!keys.length){ const o=document.createElement('option'); o.textContent='No saved plays yet'; o.value=''; sl.appendChild(o); }
+    keys.forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=(L[k].play.name||'Untitled')+' ('+(L[k].play.steps.length-1)+' steps)'; sl.appendChild(o); });
+    autosave();
+  }
+  $('name').oninput=e=>{ D.name=e.target.value; autosave(); };
+  $('house').onchange=e=>{ D.house=e.target.checked; autosave(); };
+  $('cap').oninput=e=>{ D.steps[cur].cap=e.target.value; autosave(); };
+  $('addStep').onclick=()=>{ if(D.steps.length>=9){ say('Nine steps max: keep plays short for 10U.'); return; } D.steps.splice(cur+1,0,{pos:clone(D.steps[cur].pos),cap:''}); cur++; prevT=-1; sync(); say('Step '+cur+' added. Drag players to where they end up.'); };
+  $('delStep').onclick=()=>{ if(cur===0) return; D.steps.splice(cur,1); cur=Math.min(cur,D.steps.length-1); sync(); };
+  $('newBtn').onclick=()=>{ if(D.steps.length>1 && !window.confirm('Start a new play? Unsaved changes to this one will be lost.')) return; D=fresh(TPL['fo-dz-top'].pos,false,'fo-dz-top'); cur=0; placing=false; sync(); say('New play.'); };
+  function link(){ const base=location.href.split('/designer')[0]; return base+'/play/#p='+encodePlay(D); }
+  function ready(){ if(D.steps.length<2){ say('Add at least one step first.'); return false; } return true; }
+  $('test').onclick=()=>{ if(ready()) window.open(link(),'_blank'); };
+  $('copy').onclick=()=>{ if(!ready()) return; const u=link(); (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>say('Share link copied. Paste it in a text or email.'),()=>{ window.prompt('Copy this link:',u); }); };
+  $('save').onclick=()=>{ const L=lib(); const id=D._id||('p'+Date.now()); D._id=id; L[id]={saved:Date.now(),play:clone(D)}; setLib(L); sync(); say('Saved on this device as "'+(D.name||'Untitled')+'".'); };
+  $('load').onclick=()=>{ const id=$('lib').value, L=lib(); if(!id||!L[id]) return; D=clone(L[id].play); D.names=D.names||{}; D.jobs=D.jobs||{}; cur=0; sync(); say('Opened "'+(D.name||'Untitled')+'".'); };
+  $('del').onclick=()=>{ const id=$('lib').value, L=lib(); if(!id||!L[id]) return; if(!window.confirm('Delete "'+(L[id].play.name||'Untitled')+'" from this device?')) return; delete L[id]; setLib(L); sync(); say('Deleted.'); };
+  $('preview').onclick=()=>{ if(!ready()) return; placing=false; buildStarts(); prevT=0; say(''); };
+
+  // ---------- drawing ----------
+  function rrect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function drawRink(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.save(); rrect(X(0),Y(0),200*S,85*S,24*S); ctx.fillStyle='#e9f1f8'; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#9fb0c2'; ctx.stroke(); ctx.clip();
+    const L=(x,c,w)=>{ ctx.strokeStyle=c; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(X(x),Y(0)); ctx.lineTo(X(x),Y(85)); ctx.stroke(); };
+    L(11,'#d7263d',2); L(75,'#1f6fd0',S*1.1); L(100,'#d7263d',S*1.1); L(125,'#1f6fd0',S*1.1);
+    ctx.lineWidth=2;
+    const C=(x,y,r,c)=>{ ctx.strokeStyle=c; ctx.beginPath(); ctx.arc(X(x),Y(y),r*S,0,7); ctx.stroke(); };
+    [[31,22],[31,63]].forEach(([x,y])=>{ C(x,y,15,'#d7263d'); ctx.fillStyle='#d7263d'; ctx.beginPath(); ctx.arc(X(x),Y(y),1.1*S,0,7); ctx.fill();
+      ctx.beginPath(); [[x-3,y-15,x-3,y-17.5],[x+3,y-15,x+3,y-17.5],[x-3,y+15,x-3,y+17.5],[x+3,y+15,x+3,y+17.5]].forEach(([a,b,c2,d])=>{ ctx.moveTo(X(a),Y(b)); ctx.lineTo(X(c2),Y(d)); }); ctx.stroke(); });
+    [[80,22],[80,63]].forEach(([x,y])=>{ ctx.fillStyle='#d7263d'; ctx.beginPath(); ctx.arc(X(x),Y(y),1*S,0,7); ctx.fill(); });
+    C(100,42.5,15,'#1f6fd0');
+    // IceT crest at center ice
+    drawLogo(X(100),Y(42.5));
+    ctx.fillStyle='rgba(31,111,208,.18)'; ctx.beginPath(); ctx.arc(X(11),Y(42.5),6*S,-Math.PI/2,Math.PI/2); ctx.fill(); ctx.strokeStyle='#d7263d'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle='#15202b'; ctx.fillRect(X(7),Y(39),4*S,7*S);
+    ctx.restore();
+    ctx.fillStyle='#5b6673'; ctx.font=`700 ${3*S}px "Barlow Condensed", sans-serif`; ctx.textAlign='center';
+    ctx.fillText('OUR NET',X(11),Y(-1.2)); ctx.fillText('BLUE LINE',X(75),Y(-1.2)); ctx.fillText('RED LINE',X(100),Y(-1.2));
+    ctx.textAlign='left'; ctx.fillText('STRONG SIDE ↑',X(40),Y(-1.2)); ctx.fillText('WEAK SIDE ↓',X(40),Y(89.5));
+  }
+
+  function drawLogo(cx,cy){
+    const u=S; ctx.save(); ctx.translate(cx,cy); ctx.globalAlpha=.92;
+    // badge disc
+    const g=ctx.createRadialGradient(-3*u,-4*u,1*u,0,0,13.5*u); g.addColorStop(0,'#ffffff'); g.addColorStop(1,'#cfe0f3');
+    ctx.beginPath(); ctx.arc(0,0,13.5*u,0,7); ctx.fillStyle=g; ctx.fill();
+    ctx.lineWidth=1.3*u; ctx.strokeStyle='#0d2a57'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,12*u,0,7); ctx.lineWidth=.45*u; ctx.strokeStyle='#d7263d'; ctx.stroke();
+    // crossed sticks
+    const stick=(ang)=>{ ctx.save(); ctx.rotate(ang); ctx.fillStyle='#0d2a57';
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-.55*u,-10.5*u,1.1*u,17.5*u,.5*u) : ctx.rect(-.55*u,-10.5*u,1.1*u,17.5*u); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(.55*u,6.5*u); ctx.lineTo(-3.6*u,6.9*u); ctx.quadraticCurveTo(-4.6*u,7.3*u,-4.2*u,8.3*u); ctx.lineTo(.8*u,8.1*u); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#d7263d'; ctx.fillRect(-.55*u,-10.5*u,1.1*u,2.2*u); ctx.restore(); };
+    stick(-0.62); ctx.save(); ctx.scale(-1,1); stick(-0.62); ctx.restore();
+    // stars
+    const star=(x,y,r)=>{ ctx.beginPath(); for(let i=0;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5, rr=i%2?r*.45:r; ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr); } ctx.closePath(); ctx.fillStyle='#d7263d'; ctx.fill(); };
+    star(-8.3*u,-6.2*u,1.3*u); star(8.3*u,-6.2*u,1.3*u); star(0,-9.4*u,1.5*u);
+    // wordmark
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font=`italic 800 ${10.5*u}px "Barlow Condensed", Impact, sans-serif`;
+    const tg=ctx.createLinearGradient(0,-4*u,0,4*u); tg.addColorStop(0,'#2f86ea'); tg.addColorStop(1,'#0d2a57');
+    ctx.lineJoin='round';
+    ctx.lineWidth=2.4*u; ctx.strokeStyle='#ffffff'; ctx.strokeText('IceT',0,.4*u);
+    ctx.lineWidth=.9*u; ctx.strokeStyle='#d7263d'; ctx.strokeText('IceT',0,.4*u);
+    ctx.fillStyle=tg; ctx.fillText('IceT',0,.4*u);
+    // swoosh + puck
+    ctx.beginPath(); ctx.moveTo(-8*u,6*u); ctx.quadraticCurveTo(0,9.2*u,8*u,5.2*u); ctx.quadraticCurveTo(0,7.6*u,-8*u,6*u); ctx.fillStyle='#d7263d'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,9.6*u,2.2*u,.9*u,0,0,7); ctx.fillStyle='#15202b'; ctx.fill();
+    ctx.restore();
+  }
+  const big=()=>cv.clientWidth && cv.clientWidth<700 ? 1.35 : 1;
+  function drawPlayer(p,fill,label,o={}){
+    const r=(o.r||2.9)*S*big(); ctx.save(); ctx.globalAlpha=o.alpha??1;
+    ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),r,0,7); ctx.fillStyle=fill; ctx.fill(); ctx.lineWidth=1.6; ctx.strokeStyle=o.stroke||'#fff'; ctx.stroke();
+    if(o.you){ ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),r+2.5,0,7); ctx.lineWidth=3.5; ctx.strokeStyle='#15202b'; ctx.stroke(); }
+    ctx.fillStyle=o.ink||'#fff'; ctx.font=`800 ${(label.length>1?2.6:3.2)*S*big()}px "Barlow Condensed", sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(label,X(p[0]),Y(p[1])+1);
+    if(o.you){ ctx.fillStyle='#15202b'; ctx.font=`800 ${2.6*S*big()}px "Barlow Condensed", sans-serif`; ctx.textBaseline='alphabetic'; ctx.fillText('YOU',X(p[0]),Y(p[1])-r-5); }
+    if(o.name){ nameTag(o.name,X(p[0]),Y(p[1])+r+2); }
+    ctx.restore();
+  }
+  function nameTag(t,x,y){ ctx.save(); ctx.font=`700 ${2.3*S*big()}px "Barlow Condensed", sans-serif`; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.lineJoin='round'; ctx.lineWidth=3.5; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(t,x,y); ctx.fillStyle='#15202b'; ctx.fillText(t,x,y); ctx.restore(); }
+  const nameOf=k=>((D.names||{})[k]||'').trim();
+  function drawPuck(p){ const on=(performance.now()%700)<350; ctx.save(); ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),(on?4.4:3.2)*S*big(),0,7); ctx.fillStyle='#ffd400'; ctx.globalAlpha=on?.5:.2; ctx.fill(); ctx.globalAlpha=1; ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),1.6*S*big(),0,7); ctx.fillStyle='#15202b'; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=on?'#ffd400':'#fff'; ctx.stroke(); ctx.restore(); }
+  function arrow(a,b,c,w,dashed,shorten=4.5){ const d=dist(a,b); if(d<2.5) return; const ux=(b[0]-a[0])/d, uy=(b[1]-a[1])/d; ctx.save(); ctx.strokeStyle=c; ctx.fillStyle=c; ctx.lineWidth=w; if(dashed) ctx.setLineDash([7,5]); ctx.beginPath(); ctx.moveTo(X(a[0]+ux*4),Y(a[1]+uy*4)); ctx.lineTo(X(b[0]-ux*(shorten+1.5)),Y(b[1]-uy*(shorten+1.5))); ctx.stroke(); ctx.setLineDash([]); const hx=X(b[0]-ux*shorten), hy=Y(b[1]-uy*shorten), s=2.4*S; ctx.beginPath(); ctx.moveTo(hx+ux*s,hy+uy*s); ctx.lineTo(hx-uy*s*.6,hy+ux*s*.6); ctx.lineTo(hx+uy*s*.6,hy-ux*s*.6); ctx.closePath(); ctx.fill(); ctx.restore(); }
+  function target(p,c,label){ ctx.save(); ctx.strokeStyle=c; ctx.fillStyle=c; ctx.globalAlpha=.14; ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),R*S,0,7); ctx.fill(); ctx.globalAlpha=.95; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]); if(label){ ctx.font=`800 ${3.4*S}px "Barlow Condensed", sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(label,X(p[0]),Y(p[1])); } ctx.restore(); }
+
+  const HOUSE=[[11,39],[31,24],[46,30],[46,55],[31,61],[11,46]];
+  function segD(p,a,b){ const dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy||1; const t=clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2,0,1); return Math.hypot(p[0]-(a[0]+dx*t),p[1]-(a[1]+dy*t)); }
+  function drawHouse(pos){
+    ctx.save(); ctx.beginPath(); HOUSE.forEach((p,i)=>i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1]))); ctx.closePath();
+    ctx.fillStyle='rgba(26,158,92,.12)'; ctx.fill(); ctx.strokeStyle='rgba(26,158,92,.7)'; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(26,158,92,.9)'; ctx.font=`800 ${2.8*S}px "Barlow Condensed", sans-serif`; ctx.textAlign='center'; ctx.fillText('THE HOUSE',X(36),Y(42.5)+S); ctx.restore();
+    // shot lane from the opponent with the puck
+    const carrier=THEM.map(k=>pos[k]).find(p=>dist(p,pos.puck)<4.5); if(!carrier || pos.puck[0]>80) return;
+    const net=[11,42.5], src=pos.puck; const ours=OURS.map(k=>(k===sel&&St.mode==='play'&&St.you)?St.you:pos[k]);
+    const blocked=ours.some(p=>segD(p,src,net)<3.4 && dist(p,net)>3);
+    ctx.save(); ctx.strokeStyle=blocked?'#1a9e5c':'#d7263d'; ctx.lineWidth=3; if(!blocked) ctx.setLineDash([8,6]); ctx.beginPath(); ctx.moveTo(X(src[0]),Y(src[1])); ctx.lineTo(X(net[0]),Y(net[1])); ctx.stroke(); ctx.setLineDash([]);
+    const mx=src[0]+(net[0]-src[0])*.2, my=src[1]+(net[1]-src[1])*.2-5; const txt=blocked?'LANE BLOCKED':'OPEN SHOT';
+    ctx.font=`800 ${2.8*S}px "Barlow Condensed", sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; const w=ctx.measureText(txt).width+10;
+    ctx.fillStyle=blocked?'#1a9e5c':'#d7263d'; ctx.fillRect(X(mx)-w/2,Y(my)-S*2.1,w,S*4.2); ctx.fillStyle='#fff'; ctx.fillText(txt,X(mx),Y(my)); ctx.restore();
+  }
+
+  // ---------- canvas ----------
+  function fit(){ const st=$('stage'), r=st.getBoundingClientRect(); const k=Math.min((r.width-4)/cv.width,(r.height-4)/cv.height); if(k>0){ cv.style.width=Math.floor(cv.width*k)+'px'; cv.style.height=Math.floor(cv.height*k)+'px'; } }
+  try{ new ResizeObserver(fit).observe($('stage')); }catch(e){ addEventListener('resize',fit); } fit();
+  function toRink(ev){ const r=cv.getBoundingClientRect(); return [((ev.clientX-r.left)/r.width*cv.width-ox)/S, ((ev.clientY-r.top)/r.height*cv.height-oy)/S]; }
+  function pick(p){ const pos=D.steps[cur].pos; let best=null, bd=1e9;
+    ORDER.forEach(k=>{ const d=dist(p,pos[k]) - (k==='puck'?1.5:0); if(d<bd){ bd=d; best=k; } }); return bd<5.5?best:null; }
+  const stage=$('stage');
+  stage.addEventListener('pointerdown',ev=>{ if(prevT>=0) return;
+    if(placing){ ev.preventDefault(); const p=toRink(ev); if(p[0]<1||p[0]>133||p[1]<1||p[1]>84) return;
+      const x=clamp(p[0],3,131), y=clamp(p[1],3,82);
+      if(useStart(lineup(x,y),D.house,'')) say('Players lined up around the puck. Drag anyone to fix it up, then Save this setup as a starting position if you\'ll use it again.');
+      else { placing=false; buildStarts(); } showBanner(); return; }
+    const k=pick(toRink(ev)); if(k){ drag=k; stage.classList.add('dragging'); stage.setPointerCapture(ev.pointerId); ev.preventDefault(); } });
+  stage.addEventListener('pointermove',ev=>{ if(!drag) return; const p=toRink(ev); D.steps[cur].pos[drag]=[clamp(Math.round(p[0]*2)/2,1,133),clamp(Math.round(p[1]*2)/2,1,84)]; });
+  const end=()=>{ if(drag){ drag=null; stage.classList.remove('dragging'); autosave(); } };
+  stage.addEventListener('pointerup',end); stage.addEventListener('pointercancel',end);
+
+  function drawAll(pos,{ghost=null,arrows=null,cap=''}={}){
+    drawRink();
+    if(D.house) drawHouse(pos);
+    if(ghost){ ORDER.forEach(k=>{ if(k==='puck'){ ctx.save(); ctx.globalAlpha=.3; ctx.beginPath(); ctx.arc(X(ghost[k][0]),Y(ghost[k][1]),1.6*S,0,7); ctx.fillStyle='#15202b'; ctx.fill(); ctx.restore(); return; }
+        const opp=k[0]==='O', g=k==='G'; drawPlayer(ghost[k], opp?'#c6cfd9':(k[1]==='D'||g?'#23395b':'#e8641b'), opp?'X':k, {alpha:.28, r:g?2.7:undefined, ink:opp?'#4a5561':undefined, stroke:opp?'#8c98a6':undefined}); }); }
+    if(arrows){ ORDER.forEach(k=>{ arrow(arrows[k],pos[k], k[0]==='O'?'#8c98a6':'#15202b', k==='puck'?2.2:(k[0]==='O'?1.4:1.8), k!=='puck', k==='puck'?2.5:4.5); }); }
+    THEM.forEach(k=>drawPlayer(pos[k],'#c6cfd9','X',{ink:'#4a5561',stroke:'#8c98a6'}));
+    drawPlayer(pos.G,'#23395b','G',{r:2.7,name:nameOf('G')});
+    OURS.forEach(k=>drawPlayer(pos[k], k[1]==='D'?'#23395b':'#e8641b', k, {you:drag===k, name:nameOf(k)}));
+    drawPuck(pos.puck);
+  }
+  function lerp(a,b,e){ return [a[0]+(b[0]-a[0])*e, a[1]+(b[1]-a[1])*e]; }
+  const ez=t=>t<.5?2*t*t:-1+(4-2*t)*t;
+  let last=performance.now();
+  function loop(now){
+    const dt=Math.min(.05,(now-last)/1000); last=now;
+    if(prevT>=0){
+      const times=[0,...stepTimes(D.steps)], total=times[times.length-1]+1.2; prevT+=dt*.7;
+      let i=0; while(i<times.length-2 && prevT>times[i+1]) i++;
+      const a=D.steps[i].pos, b=D.steps[Math.min(i+1,D.steps.length-1)].pos, span=(times[i+1]-times[i])||1, e=ez(clamp((prevT-times[i])/span,0,1)), pos={};
+      ORDER.forEach(k=>pos[k]=lerp(a[k],b[k],e)); drawAll(pos);
+      const si=Math.min(i+1,D.steps.length-1); $('banner').textContent=(D.steps[si].cap||('Step '+si)); $('banner').className='banner show';
+      if(prevT>total){ prevT=-1; $('banner').className='banner'; showBanner(); }
+    } else {
+      drawAll(D.steps[cur].pos, cur>0?{ghost:D.steps[cur-1].pos, arrows:D.steps[cur-1].pos}:{});
+      if(placing) DOTS.forEach(([,,d])=>{ ctx.save(); ctx.strokeStyle='rgba(215,38,61,.55)'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.arc(X(d[0]),Y(d[1]),3.2*S,0,7); ctx.stroke(); ctx.restore(); });
+    }
+    requestAnimationFrame(loop);
+  }
+  sync(); requestAnimationFrame(loop);
+})();
+</script>
+<div class="demo-ov" id="demoOv" hidden><div class="in"><div class="top"><span>How to design a play</span><button class="btn" id="demoClose">Close ✕</button></div><div id="demoBox"></div></div></div>
+<script src="../designer-demo.js"></script>
+<script>(function(){ var ov=document.getElementById('demoOv'), w=null;
+  function open(){ ov.hidden=false; if(!w) w=IceTDesignerDemo.mount(document.getElementById('demoBox')); else w.restart(); }
+  function close(){ ov.hidden=true; if(w) w.pause(); try{ localStorage.setItem('ipd-demo-seen','1'); }catch(e){} }
+  document.getElementById('demoBtn').onclick=open; document.getElementById('demoClose').onclick=close;
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!ov.hidden) close(); });
+  var seen=null; try{ seen=localStorage.getItem('ipd-demo-seen'); }catch(e){}
+  if(!seen && !/p=/.test(location.hash)) open();
+})();</script>
+</body>
+</html>

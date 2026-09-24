@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coach Guide · IceT Play Designer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;600&display=swap">
+<style>
+  :root{ --bg:#eef3f8; --panel:#ffffff; --ink:#15202b; --muted:#5b6673; --line:#d5dde6; --navy:#0d2a57; --red:#d7263d; --blue:#1f6fd0; --good:#1a9e5c; --ice:#e9f1f8; }
+  @media (prefers-color-scheme: dark){ :root{ --bg:#0f151b; --panel:#182028; --ink:#eef2f6; --muted:#9aa7b4; --line:#2a3541; --navy:#9fc6ff; --ice:#1a2530; } }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Barlow,"Segoe UI",Helvetica,Arial,sans-serif;font-size:17px;line-height:1.5}
+  main{max-width:760px;margin:0 auto;padding:22px 20px 60px}
+  .home{display:inline-block;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--blue);text-decoration:none}
+  h1{font-family:"Barlow Condensed",Impact,sans-serif;font-weight:800;font-size:44px;line-height:1;margin:8px 0 6px;text-transform:uppercase;color:var(--navy)}
+  .lede{color:var(--muted);margin:0 0 22px;font-size:18px;max-width:60ch}
+  h2{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:26px;text-transform:uppercase;letter-spacing:.4px;margin:30px 0 8px;color:var(--navy);display:flex;align-items:center;gap:10px;text-wrap:balance}
+  h2 .n{flex:none;width:32px;height:32px;border-radius:50%;background:var(--red);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:18px}
+  h3{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.3px;margin:18px 0 4px}
+  p{margin:6px 0;max-width:66ch}
+  ol,ul{margin:6px 0 6px;padding-left:22px;max-width:64ch} li{margin:5px 0}
+  b{color:var(--ink)}
+  .btnlike{display:inline-block;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.3px;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:0 7px;white-space:nowrap}
+  .btnlike.red{background:var(--red);color:#fff;border-color:var(--red)} .btnlike.dark{background:#15202b;color:#fff;border-color:#15202b}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:12px 0}
+  .tip{border-left:4px solid var(--good);background:var(--panel);border-radius:0 10px 10px 0;padding:10px 14px;margin:12px 0;font-size:16px}
+  .tip b{color:var(--good)}
+  .warn{border-left-color:var(--red)} .warn b{color:var(--red)}
+  .cta{display:inline-block;margin-top:8px;font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:.4px;background:var(--red);color:#fff;text-decoration:none;border-radius:10px;padding:10px 18px}
+  .cta:focus-visible,.home:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  figure{margin:12px 0}
+  figure svg{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line);background:#e9f1f8}
+  figcaption{font-size:14px;color:var(--muted);margin-top:4px}
+  dl{margin:6px 0} dt{font-weight:700;margin-top:10px} dd{margin:2px 0 0;color:var(--muted)}
+  code{font-size:14px;background:var(--ice);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<main>
+  <a class="home" href="../">← Home</a>
+  <h1>Coach Guide</h1>
+  <p class="lede">Design a play, check it the way the kids will, then send the link to the team. About ten minutes the first time, a few minutes after that. No accounts, no app to install.</p>
+  <a class="cta" href="../designer/">Open the Play Designer →</a>
+
+  <h2>Watch it first (35 seconds)</h2>
+  <p>A quick run-through of designing a two-step play, from picking a faceoff dot to copying the share link. Drag the slider to jump to any part.</p>
+  <div id="demo"></div>
+
+  <h2><span class="n">1</span>Pick a starting position</h2>
+  <p>The rink shows our end on the left and the neutral zone to the right. Orange are our forwards, navy are our D and goalie, and grey X's are the other team. Under <i>Starting position</i> you have three ways to set up the <b>Set</b> step:</p>
+  <dl>
+    <dt>Faceoff dot</dt>
+    <dd>The five dots on this half of the ice: <b>Our end ↑</b> and <b>Our end ↓</b> (the two D-zone circles), <b>Neutral ↑</b> and <b>Neutral ↓</b> (the dots just outside our blue line), and <b>Center ice</b>. Everyone lines up for the draw on that dot.</dd>
+    <dt>Situation</dt>
+    <dd><b>Breakout</b>, <b>D-zone coverage</b> or <b>Regroup</b>, for plays that don't start with a faceoff.</dd>
+    <dt>📍 Place puck: make your own</dt>
+    <dd>Press it, then tap the ice where the puck starts. Both teams line up around it. Drag anyone to where you want them. If you'll use this setup again, press <b>＋ Save this setup as a starting position</b> and give it a name. It shows up under <i>My starting positions</i> next time (on this device).</dd>
+  </dl>
+  <div class="tip"><b>Any start can be changed:</b> drag any player, the puck or the other team. The starting position is only a head start.</div>
+
+  <h2><span class="n">2</span>Design the play</h2>
+  <ol>
+    <li><b>Name it.</b> Use something the kids will recognise, like "D-zone faceoff loss".</li>
+    <li><b>Press</b> <span class="btnlike">+ Add step</span>. Now drag each player, and the puck, to where they are at the <b>end</b> of that step. Faded players with arrows show where they started, so you can see the movement.</li>
+    <li><b>Write one line</b> in <i>What happens in step N</i>, such as "LD passes up the wall to LW." That's the caption the kids read.</li>
+    <li><b>Repeat</b> for each step. Three or four steps is the sweet spot, and nine is the maximum.</li>
+  </ol>
+  <div class="tip"><b>Curves:</b> players move in straight lines between steps. To go behind the net or around a player, add an extra step at the turn.</div>
+  <div class="tip"><b>Moving the puck:</b> drag the puck to the player who receives the pass. Put it just in front of them, not on top, so it's easy to grab next time.</div>
+
+  <h2><span class="n">3</span>Add player names and jobs (optional)</h2>
+  <p>Open <i>Player names &amp; jobs</i>. Type a name next to any position, and it shows under that player on the rink and on the position buttons the kids tap ("C · Emma"). Leave it blank to show just the position. Names go inside the share link, so use first names only.</p>
+  <p>Under each name you can write one sentence for that position's job. Each kid sees the job for the position they pick. For defensive plays, tick <i>Show the house &amp; shot lanes</i>.</p>
+
+  <h2><span class="n">4</span>Check it the way the kids will</h2>
+  <ul>
+    <li><span class="btnlike dark">▶ Preview</span> plays the animation right in the designer, with your captions.</li>
+    <li><span class="btnlike red">Test it</span> opens the real play page in a new tab. Pick a position, press <b>Watch</b>, then <b>Play it</b> and skate it yourself. It grades each step, so if a spot is hard to reach in time, move it closer or add a step.</li>
+    <li>Need changes? Go back to the designer tab, adjust, and press <b>Test it</b> again.</li>
+  </ul>
+
+  <h2><span class="n">5</span>Send it to the team</h2>
+  <ol>
+    <li>Press <span class="btnlike">Copy share link</span>. The whole play is packed into that link.</li>
+    <li>Paste it into an email, a text or the team chat, with a line like "Faceoff play for Saturday. Pick your position, Watch it, then Play it."</li>
+    <li>Players tap the link. It opens on a phone, tablet or laptop, with nothing to sign up for. They pick their position, watch the play step by step, then skate it themselves and get a grade.</li>
+  </ol>
+  <div class="tip warn"><b>Changed the play after sending it?</b> A link always shows the version it was made from. Copy a new link and send that one.</div>
+
+  <h2><span class="n">6</span>Keep your plays</h2>
+  <p><span class="btnlike">Save</span> keeps the play on <b>this device and browser only</b>. Reopen it later from <i>My saved plays</i>. Saved plays and starting positions don't sync between devices, but a share link works everywhere. To move a play to another device, open its link there and press <b>✎ Edit (coaches)</b>.</p>
+
+  <h2>Quick answers</h2>
+  <dl>
+    <dt>Can I edit a play someone shared with me?</dt>
+    <dd>Yes. Open the link, then press <b>✎ Edit (coaches)</b>. It opens a copy in the designer. Save it or share it as a new link. The old link keeps showing the old version.</dd>
+    <dt>Does it work on a phone or iPad?</dt>
+    <dd>Yes. Turn it sideways and drag with your finger. A laptop is easier for designing; phones are great for playing.</dd>
+    <dt>I messed up a step.</dt>
+    <dd>Select the step and press <b>Delete step</b>, or just drag players back. Picking a new starting position starts over; names and jobs are kept.</dd>
+    <dt>Who can see my plays?</dt>
+    <dd>Only people you send the link to. Nothing is uploaded: the play lives in the link itself.</dd>
+  </dl>
+
+  <p style="margin-top:28px"><a class="cta" href="../designer/">Open the Play Designer →</a></p>
+</main>
+<script src="../designer-demo.js"></script>
+<script>IceTDesignerDemo.mount(document.getElementById("demo"));</script>
+</body>
+</html>
