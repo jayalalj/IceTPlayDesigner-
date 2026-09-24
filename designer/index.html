@@ -291,7 +291,7 @@
     neutral:{name:'Regroup', group:'Situation', pos:{ G:[13,42.5], puck:[100,42.5], C:[92,42.5], LW:[88,14], RW:[88,71], LD:[70,26], RD:[70,59], OC:[108,42.5], OLW:[112,71], ORW:[112,14], OD1:[128,26], OD2:[128,59] }}
   });
   const clone=o=>JSON.parse(JSON.stringify(o));
-  let D, cur=0, drag=null, prevT=-1, note='', placing=false;
+  let D, cur=0, drag=null, prevT=-1, note='', placing=false, trail=null;
   function fresh(pos,house,start){ return {name:'', house:!!house, jobs:{}, names:{}, start:start||'', steps:[{pos:clone(pos), cap:''}]}; }
   // storage (this device only)
   const K_CUR='ipd-current', K_LIB='ipd-designs', K_START='ipd-starts';
@@ -357,9 +357,9 @@
       if(x<22&&y>=30&&y<=55) return 'the front of our net';
       if(x<45&&y>=24&&y<=61) return 'the slot';
       if(x<62) return mid?'the high slot':'the top of the '+side+' circle';
-      return mid?'the middle at our blue line':'the '+side+' side at our blue line';
+      return mid?'the middle at our blue line':'the '+side.replace('-side','')+' side at our blue line';
     }
-    if(x<100) return mid?'the middle of the neutral zone':'the '+side+' side of the neutral zone';
+    if(x<100) return mid?'the middle of the neutral zone':'the '+side.replace('-side','')+' side of the neutral zone';
     return 'center ice and beyond';
   }
   const to=w=>w==='behind our net'?w:'to '+w;
@@ -533,12 +533,34 @@
       const x=clamp(p[0],3,131), y=clamp(p[1],3,82);
       if(useStart(lineup(x,y),D.house,'')){ D.setMoved=true; refreshSave(); say('Players lined up around the puck. Drag anyone to fix it up. Press + Save as my starting position if you\'ll use it again.'); }
       else { placing=false; buildStarts(); } showBanner(); return; }
-    const k=pick(toRink(ev)); if(k){ drag=k; stage.classList.add('dragging'); stage.setPointerCapture(ev.pointerId); ev.preventDefault(); } });
+    const k=pick(toRink(ev)); if(k){ drag=k; trail = (k==='puck'&&cur>0) ? [D.steps[cur].pos.puck.slice()] : null; stage.classList.add('dragging'); stage.setPointerCapture(ev.pointerId); ev.preventDefault(); } });
   stage.addEventListener('pointermove',ev=>{ if(!drag) return; const p=toRink(ev);
-    if(drag==='bounce'){ D.steps[cur].pk.b=projBoard(p).pt.map(v=>Math.round(v*2)/2); return; } D.steps[cur].pos[drag]=[clamp(Math.round(p[0]*2)/2,1,133),clamp(Math.round(p[1]*2)/2,1,84)]; });
+    if(drag==='bounce'){ D.steps[cur].pk.b=projBoard(p).pt.map(v=>Math.round(v*2)/2); return; } D.steps[cur].pos[drag]=[clamp(Math.round(p[0]*2)/2,1,133),clamp(Math.round(p[1]*2)/2,1,84)];
+    if(trail && dist(trail[trail.length-1],p)>=1) trail.push([clamp(p[0],1,133),clamp(p[1],1,84)]); });
   const end=()=>{ if(drag){ drag=null; stage.classList.remove('dragging');
-      if(cur===0) D.setMoved=true; else { D.steps[cur].dirty=true; autoCap(); }
-      refreshSave(); autosave(); } };
+      if(cur===0) D.setMoved=true; else { if(trail) readTrail(trail); D.steps[cur].dirty=true; autoCap(); buildPuckPath(); }
+      trail=null; refreshSave(); autosave(); } };
+  // Read the puck's drag path: slide it along the boards = rim, touch the boards in the middle = bank, anything else = straight.
+  function classifyTrail(tr){
+    if(tr.length<4 || polyLen(tr)<8) return null;
+    const pr=tr.map(p=>projBoard(p)), near=pr.map(q=>q.d<6), L=polyLen(tr);
+    let run=0, acc=[0]; for(let i=1;i<tr.length;i++){ run+=dist(tr[i-1],tr[i]); acc.push(run); }
+    const ss=pr.filter((q,i)=>near[i]).map(q=>q.s), span=ss.length?Math.max(...ss)-Math.min(...ss):0;
+    const nearLen=tr.reduce((t,p,i)=>i&&near[i]&&near[i-1]?t+dist(tr[i-1],p):t,0);
+    if(span>=18 && nearLen>=15) return {t:'rim'};
+    const mid=pr.map((q,i)=>({q,i})).filter(o=>acc[o.i]>L*.15 && acc[o.i]<L*.85);
+    const hit=mid.reduce((b,o)=>!b||o.q.d<b.q.d?o:b,null);
+    if(hit && hit.q.d<4 && pr[0].d>6 && pr[pr.length-1].d>6) return {t:'bank', b:hit.q.pt.map(v=>Math.round(v*2)/2)};
+    return {t:''};
+  }
+  function readTrail(tr){
+    const c=classifyTrail(tr), st=D.steps[cur]; if(!c) return;
+    const was=st.pk?st.pk.t:'';
+    if(c.t) st.pk=c.t==='bank'?{t:'bank',b:c.b}:{t:'rim'}; else delete st.pk;
+    if(c.t!==was) say(c.t==='rim'?'You slid the puck along the boards, so it\'s a rim (Along the boards). Tap Straight on the ice to change it.'
+      : c.t==='bank'?'You bounced the puck off the boards, so it\'s a bank pass. Drag the orange ◆ to fine-tune where it hits.'
+      : 'Straight pass.');
+  }
   stage.addEventListener('pointerup',end); stage.addEventListener('pointercancel',end);
 
   function drawAll(pos,{ghost=null,arrows=null,cap=''}={}){
@@ -574,6 +596,7 @@
       if(prevT>total){ prevT=-1; $('banner').className='banner'; showBanner(); buildPuckPath(); }
     } else {
       drawAll(D.steps[cur].pos, cur>0?{ghost:D.steps[cur-1].pos, arrows:D.steps[cur-1].pos}:{});
+      if(trail && trail.length>1){ ctx.save(); ctx.strokeStyle='rgba(31,111,208,.6)'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash([2,6]); ctx.beginPath(); trail.forEach((p,i)=>i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1]))); ctx.stroke(); ctx.restore(); }
       if(placing) DOTS.forEach(([,,d])=>{ ctx.save(); ctx.strokeStyle='rgba(215,38,61,.55)'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.arc(X(d[0]),Y(d[1]),3.2*S,0,7); ctx.stroke(); ctx.restore(); });
     }
     requestAnimationFrame(loop);
