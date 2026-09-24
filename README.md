@@ -15,3 +15,6 @@ ORDER = G, C, LW, RW, LD, RD, OC, OLW, ORW, OD1, OD2, puck. Rink units are feet:
 ## Publish
 Double-click `push.bat`. GitHub Pages: Settings → Pages → Deploy from branch → `main` / root.
 Site: https://jayalalj.github.io/IceTPlayDesigner-/
+
+## Version
+Every page shows a small version tag (top right, `id="ver"`). Bump it on all four pages with each release so you can tell the live site has updated.
