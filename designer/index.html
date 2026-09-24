@@ -117,6 +117,8 @@
   .mine .chip{background:transparent} .mine .chip[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
   .mine .x{border:0;background:transparent;color:var(--muted);font-size:14px;padding:4px 9px 4px 2px;cursor:pointer;border-radius:999px}
   .mine .x:hover{color:var(--accent)}
+  .phint{margin-top:4px;color:var(--muted);font-size:13px}
+  #puckBox[hidden]{display:none}
   .linkbtn{border:0;background:none;padding:2px 0;color:var(--blue);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:underline}
   .linkbtn[hidden]{display:none}
   .demo-ov{position:fixed;inset:0;z-index:9996;background:rgba(10,15,20,.7);display:flex;align-items:center;justify-content:center;padding:14px}
@@ -147,6 +149,7 @@
       <div class="row2" style="margin-top:6px"><button class="btn" id="addStep">+ Add step</button><button class="btn" id="delStep">Delete step</button></div>
     </div>
     <div class="field"><div class="k" id="capLabel">What happens in this step</div><textarea id="cap" maxlength="220" placeholder="e.g. LD passes up the wall to LW. C swings through the middle."></textarea></div>
+    <div id="puckBox"><div class="k">Puck path in this step</div><div class="chips" id="puckPath"></div><div class="phint" id="puckHint"></div></div>
     <label class="ctl"><input type="checkbox" id="house"> Show the house &amp; shot lanes (defense plays)</label>
     <details class="box" id="playersBox"><summary>Player names &amp; jobs (optional)</summary>
       <div class="jobs" id="jobs"></div>
@@ -193,16 +196,46 @@
       s:p.steps.map(st=>ORDER.flatMap(k=>[Math.round(st.pos[k][0]*2),Math.round(st.pos[k][1]*2)])),
       c:p.steps.map(s=>s.cap||''), j:p.jobs||{}};
     const nm={}; Object.entries(p.names||{}).forEach(([k,v])=>{ v=String(v||'').trim(); if(v) nm[k]=v; }); if(Object.keys(nm).length) o.m=nm;
+    if(p.steps.some(s=>s.pk)) o.k=p.steps.map((s,i)=>!s.pk||!i?0: s.pk.t==='rim'?1 : (b=>[2,Math.round(b[0]*2),Math.round(b[1]*2)])(s.pk.b||bankDefault(p.steps[i-1].pos.puck,s.pos.puck)));
     return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   }
   function decodePlay(str){
     str=str.replace(/-/g,'+').replace(/_/g,'/'); while(str.length%4) str+='=';
     const o=JSON.parse(decodeURIComponent(escape(atob(str))));
     return {name:o.n||'Coach play', house:!!o.h, jobs:o.j||{}, names:o.m||{},
-      steps:o.s.map((a,i)=>({cap:(o.c||[])[i]||'', pos:Object.fromEntries(ORDER.map((k,j)=>[k,[a[2*j]/2,a[2*j+1]/2]]))}))};
+      steps:o.s.map((a,i)=>{ const st={cap:(o.c||[])[i]||'', pos:Object.fromEntries(ORDER.map((k,j)=>[k,[a[2*j]/2,a[2*j+1]/2]]))}, k=(o.k||[])[i];
+        if(k===1) st.pk={t:'rim'}; else if(Array.isArray(k)&&k[0]===2) st.pk={t:'bank',b:[k[1]/2,k[2]/2]}; return st; })};
   }
-  function stepTimes(steps){ // seconds for each step, from how far players move
-    let t=0; return steps.slice(1).map((st,i)=>{ const prev=steps[i].pos; let d=0; ORDER.forEach(k=>{ d=Math.max(d,Math.hypot(st.pos[k][0]-prev[k][0],st.pos[k][1]-prev[k][1])); }); t+=Math.max(0.9,d/24); return +t.toFixed(2); });
+  // ---------- puck paths: straight, along the boards (rim), off the boards (bank) ----------
+  const BW=2.5, CRN=24;               // path runs 2.5 ft inside the boards; corner radius 24 ft
+  const BOARD=(()=>{ const P=[[134,BW]]; const arc=(cx,cy,a0,a1)=>{ for(let i=0;i<=12;i++){ const a=a0+(a1-a0)*i/12; P.push([cx+(CRN-BW)*Math.cos(a), cy+(CRN-BW)*Math.sin(a)]); } };
+    arc(CRN,CRN,-Math.PI/2,-Math.PI); arc(CRN,85-CRN,Math.PI,Math.PI/2); P.push([134,85-BW]); return P; })();
+  const BL=BOARD.reduce((L,p,i)=>{ L.push(i?L[i-1]+Math.hypot(p[0]-BOARD[i-1][0],p[1]-BOARD[i-1][1]):0); return L; },[]);
+  function projBoard(p){ let best={d:1e9}; for(let i=1;i<BOARD.length;i++){ const a=BOARD[i-1], b=BOARD[i], dx=b[0]-a[0], dy=b[1]-a[1], l2=dx*dx+dy*dy||1;
+      const t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2)), q=[a[0]+dx*t,a[1]+dy*t], d=Math.hypot(p[0]-q[0],p[1]-q[1]);
+      if(d<best.d) best={d, pt:q, s:BL[i-1]+t*Math.sqrt(l2)}; } return best; }
+  function bankDefault(a,b){ // where a pass off the boards hits: mirror the target across the nearest wall
+    const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2; let hit;
+    if(mx<16){ const bx=2*BW-b[0], t=(BW-a[0])/((bx-a[0])||-1e-6); hit=[BW, a[1]+t*(b[1]-a[1])]; }
+    else { const wy=my<42.5?BW:85-BW, by=2*wy-b[1], t=(wy-a[1])/((by-a[1])||1e-6); hit=[a[0]+t*(b[0]-a[0]), wy]; }
+    if(!isFinite(hit[0])||!isFinite(hit[1])) hit=[mx,my];
+    return projBoard(hit).pt.map(v=>Math.round(v*2)/2);
+  }
+  function puckVia(a,b,pk){ // waypoints the puck passes through between a and b
+    if(!pk) return [];
+    if(pk.t==='bank') return [pk.b||bankDefault(a,b)];
+    if(pk.t==='rim'){ const pa=projBoard(a), pb=projBoard(b), out=[];
+      if(pa.d>1) out.push(pa.pt);
+      const lo=Math.min(pa.s,pb.s), hi=Math.max(pa.s,pb.s), mid=[]; for(let i=0;i<BOARD.length;i++) if(BL[i]>lo+.5&&BL[i]<hi-.5) mid.push(BOARD[i]);
+      if(pa.s>pb.s) mid.reverse(); out.push(...mid); if(pb.d>1) out.push(pb.pt); return out; }
+    return [];
+  }
+  function polyLen(pts){ let L=0; for(let i=1;i<pts.length;i++) L+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); return L; }
+  function stepTimes(steps){ // seconds for each step, from how far players (and the puck) move
+    let t=0; return steps.slice(1).map((st,i)=>{ const prev=steps[i].pos; let d=0; ORDER.forEach(k=>{
+        let dk=Math.hypot(st.pos[k][0]-prev[k][0],st.pos[k][1]-prev[k][1]);
+        if(k==='puck'&&st.pk) dk=polyLen([prev.puck,...puckVia(prev.puck,st.pos.puck,st.pk),st.pos.puck])*.55; // passes travel faster than skaters
+        d=Math.max(d,dk); }); t+=Math.max(0.9,d/24); return +t.toFixed(2); });
   }
 
   const OURS=['C','LW','RW','LD','RD'], THEM=['OC','OLW','ORW','OD1','OD2'];
@@ -271,8 +304,9 @@
     const box=$('tpl'); box.innerHTML='';
     const grp=(label)=>{ const g=document.createElement('div'); g.className='startgrp'; const l=document.createElement('div'); l.className='glabel'; l.textContent=label; g.appendChild(l); box.appendChild(g); return g; };
     let g=grp('Faceoff dot'); DOTS.forEach(([id,name])=>g.appendChild(chip(name,D.start===id,()=>{ if(useStart(TPL[id].pos,false,id,name)) say('Faceoff lineup set. Drag anyone you want somewhere else.'); })));
+    const br=document.createElement('div'); br.style.flexBasis='100%'; br.style.height='0'; g.appendChild(br);
+    const pl=chip('📍 Place puck anywhere',placing,()=>{ placing=!placing; if(placing){ say('Tap the ice where the puck starts. Players line up around it.'); } else say(''); buildStarts(); showBanner(); }); pl.classList.add('place'); g.appendChild(pl);
     g=grp('Situation'); ['breakout','dzone','neutral'].forEach(id=>g.appendChild(chip(TPL[id].name,D.start===id,()=>useStart(TPL[id].pos,TPL[id].house,id,TPL[id].name))));
-    const pl=chip('📍 Place puck',placing,()=>{ placing=!placing; if(placing){ say('Tap the ice where the puck starts. Players line up around it.'); } else say(''); buildStarts(); showBanner(); }); pl.classList.add('place'); g.appendChild(pl);
     const M=starts(), ids=Object.keys(M).sort((a,b)=>M[a].saved-M[b].saved);
     if(ids.length){ g=grp('My starting positions');
       ids.forEach(id=>{ const w=document.createElement('span'); w.className='mine';
@@ -280,6 +314,15 @@
         const x=document.createElement('button'); x.type='button'; x.className='x'; x.textContent='✕'; x.title='Delete "'+M[id].name+'"'; x.setAttribute('aria-label','Delete starting position '+M[id].name);
         x.onclick=()=>{ if(!window.confirm('Delete the starting position "'+M[id].name+'" from this device?')) return; const A=starts(); delete A[id]; jset(K_START,A); if(D.start===id) D.start=''; buildStarts(); };
         w.appendChild(x); g.appendChild(w); }); }
+  }
+  const PATHS=[['','Straight'],['rim','Along the boards'],['bank','Off the boards']];
+  function buildPuckPath(){
+    const box=$('puckBox'); box.hidden = cur===0; if(cur===0) return;
+    const st=D.steps[cur], t=st.pk?st.pk.t:'', row=$('puckPath'); row.innerHTML='';
+    PATHS.forEach(([k,label])=>row.appendChild(chip(label,t===k,()=>{ st.pk=k?{t:k}:undefined; if(!st.pk) delete st.pk; buildPuckPath(); autosave(); })));
+    $('puckHint').textContent = t==='rim' ? 'The puck rims around the boards to where you drop it. Drag the puck to where it ends up.'
+      : t==='bank' ? 'The puck bounces off the boards. Drag the orange ◆ along the boards to change where it hits.'
+      : 'Rim it around the boards, or bank a pass off the wall.';
   }
   function showBanner(){ $('stage').classList.toggle('placing',placing); if(placing && prevT<0){ $('banner').textContent='Tap where the puck starts'; $('banner').className='banner show'; } else if(prevT<0) $('banner').className='banner'; }
   $('saveStart').onclick=()=>{
@@ -297,7 +340,7 @@
   function sync(){
     $('name').value=D.name||''; $('house').checked=!!D.house;
     OURS.forEach(k=>{ $('job-'+k).value=D.jobs[k]||''; }); [...OURS,'G'].forEach(k=>{ $('nm-'+k).value=D.names[k]||''; });
-    buildStarts(); $('saveStart').hidden = cur!==0; showBanner();
+    buildStarts(); buildPuckPath(); $('saveStart').hidden = cur!==0; showBanner();
     const st=$('steps'); st.innerHTML='';
     D.steps.forEach((s,i)=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=i===0?'Set':String(i); b.setAttribute('aria-pressed',i===cur); b.onclick=()=>{ cur=i; prevT=-1; sync(); }; st.appendChild(b); });
     $('delStep').disabled = cur===0;
@@ -412,7 +455,9 @@
   function fit(){ const st=$('stage'), r=st.getBoundingClientRect(); const k=Math.min((r.width-4)/cv.width,(r.height-4)/cv.height); if(k>0){ cv.style.width=Math.floor(cv.width*k)+'px'; cv.style.height=Math.floor(cv.height*k)+'px'; } }
   try{ new ResizeObserver(fit).observe($('stage')); }catch(e){ addEventListener('resize',fit); } fit();
   function toRink(ev){ const r=cv.getBoundingClientRect(); return [((ev.clientX-r.left)/r.width*cv.width-ox)/S, ((ev.clientY-r.top)/r.height*cv.height-oy)/S]; }
+  function bounceAt(){ const st=D.steps[cur]; if(cur===0||!st.pk||st.pk.t!=='bank') return null; return st.pk.b||bankDefault(D.steps[cur-1].pos.puck,st.pos.puck); }
   function pick(p){ const pos=D.steps[cur].pos; let best=null, bd=1e9;
+    const bp=bounceAt(); if(bp && dist(p,bp)<4.5) return 'bounce';
     ORDER.forEach(k=>{ const d=dist(p,pos[k]) - (k==='puck'?1.5:0); if(d<bd){ bd=d; best=k; } }); return bd<5.5?best:null; }
   const stage=$('stage');
   stage.addEventListener('pointerdown',ev=>{ if(prevT>=0) return;
@@ -421,7 +466,8 @@
       if(useStart(lineup(x,y),D.house,'')) say('Players lined up around the puck. Drag anyone to fix it up, then Save this setup as a starting position if you\'ll use it again.');
       else { placing=false; buildStarts(); } showBanner(); return; }
     const k=pick(toRink(ev)); if(k){ drag=k; stage.classList.add('dragging'); stage.setPointerCapture(ev.pointerId); ev.preventDefault(); } });
-  stage.addEventListener('pointermove',ev=>{ if(!drag) return; const p=toRink(ev); D.steps[cur].pos[drag]=[clamp(Math.round(p[0]*2)/2,1,133),clamp(Math.round(p[1]*2)/2,1,84)]; });
+  stage.addEventListener('pointermove',ev=>{ if(!drag) return; const p=toRink(ev);
+    if(drag==='bounce'){ D.steps[cur].pk.b=projBoard(p).pt.map(v=>Math.round(v*2)/2); return; } D.steps[cur].pos[drag]=[clamp(Math.round(p[0]*2)/2,1,133),clamp(Math.round(p[1]*2)/2,1,84)]; });
   const end=()=>{ if(drag){ drag=null; stage.classList.remove('dragging'); autosave(); } };
   stage.addEventListener('pointerup',end); stage.addEventListener('pointercancel',end);
 
@@ -430,12 +476,18 @@
     if(D.house) drawHouse(pos);
     if(ghost){ ORDER.forEach(k=>{ if(k==='puck'){ ctx.save(); ctx.globalAlpha=.3; ctx.beginPath(); ctx.arc(X(ghost[k][0]),Y(ghost[k][1]),1.6*S,0,7); ctx.fillStyle='#15202b'; ctx.fill(); ctx.restore(); return; }
         const opp=k[0]==='O', g=k==='G'; drawPlayer(ghost[k], opp?'#c6cfd9':(k[1]==='D'||g?'#23395b':'#e8641b'), opp?'X':k, {alpha:.28, r:g?2.7:undefined, ink:opp?'#4a5561':undefined, stroke:opp?'#8c98a6':undefined}); }); }
-    if(arrows){ ORDER.forEach(k=>{ arrow(arrows[k],pos[k], k[0]==='O'?'#8c98a6':'#15202b', k==='puck'?2.2:(k[0]==='O'?1.4:1.8), k!=='puck', k==='puck'?2.5:4.5); }); }
+    if(arrows){ ORDER.forEach(k=>{ if(k==='puck'&&D.steps[cur].pk) return; arrow(arrows[k],pos[k], k[0]==='O'?'#8c98a6':'#15202b', k==='puck'?2.2:(k[0]==='O'?1.4:1.8), k!=='puck', k==='puck'?2.5:4.5); });
+      const pk=D.steps[cur].pk; if(pk){ const via=puckVia(arrows.puck,pos.puck,pk), pts=[arrows.puck,...via,pos.puck];
+        ctx.save(); ctx.strokeStyle='#15202b'; ctx.lineWidth=2.2; ctx.lineJoin='round'; ctx.beginPath(); ctx.moveTo(X(pts[0][0]),Y(pts[0][1])); for(let i=1;i<pts.length-1;i++) ctx.lineTo(X(pts[i][0]),Y(pts[i][1])); ctx.stroke(); ctx.restore();
+        arrow(pts[pts.length-2],pts[pts.length-1],'#15202b',2.2,false,2.5);
+        if(pk.t==='bank'){ const b=via[0], r=2.4*S*big(); ctx.save(); ctx.translate(X(b[0]),Y(b[1])); ctx.rotate(Math.PI/4); ctx.fillStyle=drag==='bounce'?'#d7263d':'#e8641b'; ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.fillRect(-r/1.4,-r/1.4,r*1.4,r*1.4); ctx.strokeRect(-r/1.4,-r/1.4,r*1.4,r*1.4); ctx.restore(); } } }
     THEM.forEach(k=>drawPlayer(pos[k],'#c6cfd9','X',{ink:'#4a5561',stroke:'#8c98a6'}));
     drawPlayer(pos.G,'#23395b','G',{r:2.7,name:nameOf('G')});
     OURS.forEach(k=>drawPlayer(pos[k], k[1]==='D'?'#23395b':'#e8641b', k, {you:drag===k, name:nameOf(k)}));
     drawPuck(pos.puck);
   }
+  function along(pts,e){ const L=[0]; for(let i=1;i<pts.length;i++) L.push(L[i-1]+dist(pts[i-1],pts[i]));
+    const d=e*L[L.length-1]; let i=1; while(i<pts.length-1 && L[i]<d) i++; const seg=(L[i]-L[i-1])||1, u=(d-L[i-1])/seg; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*u, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*u]; }
   function lerp(a,b,e){ return [a[0]+(b[0]-a[0])*e, a[1]+(b[1]-a[1])*e]; }
   const ez=t=>t<.5?2*t*t:-1+(4-2*t)*t;
   let last=performance.now();
@@ -445,7 +497,9 @@
       const times=[0,...stepTimes(D.steps)], total=times[times.length-1]+1.2; prevT+=dt*.7;
       let i=0; while(i<times.length-2 && prevT>times[i+1]) i++;
       const a=D.steps[i].pos, b=D.steps[Math.min(i+1,D.steps.length-1)].pos, span=(times[i+1]-times[i])||1, e=ez(clamp((prevT-times[i])/span,0,1)), pos={};
-      ORDER.forEach(k=>pos[k]=lerp(a[k],b[k],e)); drawAll(pos);
+      ORDER.forEach(k=>pos[k]=lerp(a[k],b[k],e));
+      const nb=D.steps[Math.min(i+1,D.steps.length-1)], via=i+1<D.steps.length?puckVia(a.puck,b.puck,nb.pk):[]; if(via.length) pos.puck=along([a.puck,...via,b.puck],e);
+      drawAll(pos);
       const si=Math.min(i+1,D.steps.length-1); $('banner').textContent=(D.steps[si].cap||('Step '+si)); $('banner').className='banner show';
       if(prevT>total){ prevT=-1; $('banner').className='banner'; showBanner(); }
     } else {

@@ -252,16 +252,46 @@
       s:p.steps.map(st=>ORDER.flatMap(k=>[Math.round(st.pos[k][0]*2),Math.round(st.pos[k][1]*2)])),
       c:p.steps.map(s=>s.cap||''), j:p.jobs||{}};
     const nm={}; Object.entries(p.names||{}).forEach(([k,v])=>{ v=String(v||'').trim(); if(v) nm[k]=v; }); if(Object.keys(nm).length) o.m=nm;
+    if(p.steps.some(s=>s.pk)) o.k=p.steps.map((s,i)=>!s.pk||!i?0: s.pk.t==='rim'?1 : (b=>[2,Math.round(b[0]*2),Math.round(b[1]*2)])(s.pk.b||bankDefault(p.steps[i-1].pos.puck,s.pos.puck)));
     return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   }
   function decodePlay(str){
     str=str.replace(/-/g,'+').replace(/_/g,'/'); while(str.length%4) str+='=';
     const o=JSON.parse(decodeURIComponent(escape(atob(str))));
     return {name:o.n||'Coach play', house:!!o.h, jobs:o.j||{}, names:o.m||{},
-      steps:o.s.map((a,i)=>({cap:(o.c||[])[i]||'', pos:Object.fromEntries(ORDER.map((k,j)=>[k,[a[2*j]/2,a[2*j+1]/2]]))}))};
+      steps:o.s.map((a,i)=>{ const st={cap:(o.c||[])[i]||'', pos:Object.fromEntries(ORDER.map((k,j)=>[k,[a[2*j]/2,a[2*j+1]/2]]))}, k=(o.k||[])[i];
+        if(k===1) st.pk={t:'rim'}; else if(Array.isArray(k)&&k[0]===2) st.pk={t:'bank',b:[k[1]/2,k[2]/2]}; return st; })};
   }
-  function stepTimes(steps){ // seconds for each step, from how far players move
-    let t=0; return steps.slice(1).map((st,i)=>{ const prev=steps[i].pos; let d=0; ORDER.forEach(k=>{ d=Math.max(d,Math.hypot(st.pos[k][0]-prev[k][0],st.pos[k][1]-prev[k][1])); }); t+=Math.max(0.9,d/24); return +t.toFixed(2); });
+  // ---------- puck paths: straight, along the boards (rim), off the boards (bank) ----------
+  const BW=2.5, CRN=24;               // path runs 2.5 ft inside the boards; corner radius 24 ft
+  const BOARD=(()=>{ const P=[[134,BW]]; const arc=(cx,cy,a0,a1)=>{ for(let i=0;i<=12;i++){ const a=a0+(a1-a0)*i/12; P.push([cx+(CRN-BW)*Math.cos(a), cy+(CRN-BW)*Math.sin(a)]); } };
+    arc(CRN,CRN,-Math.PI/2,-Math.PI); arc(CRN,85-CRN,Math.PI,Math.PI/2); P.push([134,85-BW]); return P; })();
+  const BL=BOARD.reduce((L,p,i)=>{ L.push(i?L[i-1]+Math.hypot(p[0]-BOARD[i-1][0],p[1]-BOARD[i-1][1]):0); return L; },[]);
+  function projBoard(p){ let best={d:1e9}; for(let i=1;i<BOARD.length;i++){ const a=BOARD[i-1], b=BOARD[i], dx=b[0]-a[0], dy=b[1]-a[1], l2=dx*dx+dy*dy||1;
+      const t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2)), q=[a[0]+dx*t,a[1]+dy*t], d=Math.hypot(p[0]-q[0],p[1]-q[1]);
+      if(d<best.d) best={d, pt:q, s:BL[i-1]+t*Math.sqrt(l2)}; } return best; }
+  function bankDefault(a,b){ // where a pass off the boards hits: mirror the target across the nearest wall
+    const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2; let hit;
+    if(mx<16){ const bx=2*BW-b[0], t=(BW-a[0])/((bx-a[0])||-1e-6); hit=[BW, a[1]+t*(b[1]-a[1])]; }
+    else { const wy=my<42.5?BW:85-BW, by=2*wy-b[1], t=(wy-a[1])/((by-a[1])||1e-6); hit=[a[0]+t*(b[0]-a[0]), wy]; }
+    if(!isFinite(hit[0])||!isFinite(hit[1])) hit=[mx,my];
+    return projBoard(hit).pt.map(v=>Math.round(v*2)/2);
+  }
+  function puckVia(a,b,pk){ // waypoints the puck passes through between a and b
+    if(!pk) return [];
+    if(pk.t==='bank') return [pk.b||bankDefault(a,b)];
+    if(pk.t==='rim'){ const pa=projBoard(a), pb=projBoard(b), out=[];
+      if(pa.d>1) out.push(pa.pt);
+      const lo=Math.min(pa.s,pb.s), hi=Math.max(pa.s,pb.s), mid=[]; for(let i=0;i<BOARD.length;i++) if(BL[i]>lo+.5&&BL[i]<hi-.5) mid.push(BOARD[i]);
+      if(pa.s>pb.s) mid.reverse(); out.push(...mid); if(pb.d>1) out.push(pb.pt); return out; }
+    return [];
+  }
+  function polyLen(pts){ let L=0; for(let i=1;i<pts.length;i++) L+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); return L; }
+  function stepTimes(steps){ // seconds for each step, from how far players (and the puck) move
+    let t=0; return steps.slice(1).map((st,i)=>{ const prev=steps[i].pos; let d=0; ORDER.forEach(k=>{
+        let dk=Math.hypot(st.pos[k][0]-prev[k][0],st.pos[k][1]-prev[k][1]);
+        if(k==='puck'&&st.pk) dk=polyLen([prev.puck,...puckVia(prev.puck,st.pos.puck,st.pk),st.pos.puck])*.55; // passes travel faster than skaters
+        d=Math.max(d,dk); }); t+=Math.max(0.9,d/24); return +t.toFixed(2); });
   }
 
   function toVar(p){
@@ -269,7 +299,7 @@
     return { id:'custom', group:'Coach play', name:p.name, house:p.house, setup:p.steps[0].pos, names:p.names||{},
       caps:p.steps.map((s,i)=>s.cap||(i===0?'Set.':'Step '+i+'.')),
       jobs:{C:p.jobs.C||dj, LW:p.jobs.LW||dj, RW:p.jobs.RW||dj, LD:p.jobs.LD||dj, RD:p.jobs.RD||dj},
-      kf:p.steps.slice(1).map((s,i)=>({t:times[i], p:s.pos})) };
+      kf:p.steps.slice(1).map((s,i)=>{ const v=puckVia(p.steps[i].pos.puck,s.pos.puck,s.pk); return v.length?{t:times[i], p:s.pos, via:{puck:v}}:{t:times[i], p:s.pos}; }) };
   }
   let LOADED=null; try{ const m=location.hash.match(/p=([^&]+)/); if(m) LOADED=decodePlay(m[1]); }catch(e){ LOADED=null; }
   if(LOADED && LOADED.steps.length>1){ VARS.length=0; VARS.push(toVar(LOADED)); }
