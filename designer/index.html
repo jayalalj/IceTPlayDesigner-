@@ -117,8 +117,18 @@
   .mine .chip{background:transparent} .mine .chip[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
   .mine .x{border:0;background:transparent;color:var(--muted);font-size:14px;padding:4px 9px 4px 2px;cursor:pointer;border-radius:999px}
   .mine .x:hover{color:var(--accent)}
+  .icebar{position:absolute;right:10px;bottom:10px;display:flex;gap:4px;align-items:center;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:999px;padding:4px 5px 4px 12px;box-shadow:0 3px 12px rgba(13,42,87,.15);z-index:2}
+  .icebar[hidden]{display:none}
+  .icebar>span{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#5b6673;margin-right:2px}
+  .icebar button{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.3px;border:0;border-radius:999px;padding:5px 10px;background:#e6ebf1;color:#15202b;cursor:pointer}
+  .icebar button[aria-pressed="true"]{background:#15202b;color:#fff}
+  .icebar button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  .icebar .s{display:none}
+  @media (max-width:760px),(max-height:520px){ .icebar{right:6px;bottom:6px;padding:3px 3px 3px 8px} .icebar>span{font-size:11px} .icebar button{font-size:12px;padding:4px 8px;white-space:nowrap} }
+  @media (max-width:760px) and (orientation:portrait){ .icebar .l{display:none} .icebar .s{display:inline} }
+  #saveStep[hidden],#saveStart[hidden]{display:none}
+  .chip.draft{box-shadow:inset 0 0 0 2px var(--accent)}
   .phint{margin-top:4px;color:var(--muted);font-size:13px}
-  #puckBox[hidden]{display:none}
   .linkbtn{border:0;background:none;padding:2px 0;color:var(--blue);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:underline}
   .linkbtn[hidden]{display:none}
   .demo-ov{position:fixed;inset:0;z-index:9996;background:rgba(10,15,20,.7);display:flex;align-items:center;justify-content:center;padding:14px}
@@ -132,6 +142,7 @@
   <div class="stage" id="stage">
     <canvas id="c" width="1040" height="745"></canvas>
     <div class="banner" id="banner"></div>
+    <div class="icebar" id="puckBar" hidden role="group" aria-label="Puck path in this step"><span>Puck</span></div>
   </div>
   <aside class="panel">
     <div>
@@ -141,15 +152,19 @@
       <button class="btn" id="demoBtn" style="margin-top:6px;width:100%">▶ Watch the 35-second demo</button>
     </div>
     <div class="field"><div class="k">Play name</div><input type="text" id="name" maxlength="60" placeholder="e.g. D-zone faceoff loss"></div>
-    <div><div class="k">Starting position</div><div id="tpl"></div>
-      <button class="linkbtn" id="saveStart" type="button">＋ Save this setup as a starting position</button></div>
+    <div><div class="k">Starting position</div><div id="tpl"></div></div>
     <div>
       <div class="k">Steps</div>
       <div class="steps" id="steps"></div>
       <div class="row2" style="margin-top:6px"><button class="btn" id="addStep">+ Add step</button><button class="btn" id="delStep">Delete step</button></div>
     </div>
-    <div class="field"><div class="k" id="capLabel">What happens in this step</div><textarea id="cap" maxlength="220" placeholder="e.g. LD passes up the wall to LW. C swings through the middle."></textarea></div>
-    <div id="puckBox"><div class="k">Puck path in this step</div><div class="chips" id="puckPath"></div><div class="phint" id="puckHint"></div></div>
+    <div class="field"><div class="k" id="capLabel">What happens in this step</div>
+      <div class="phint" id="capHint" hidden>Written for you from your moves. Change anything you like.</div>
+      <textarea id="cap" maxlength="220" placeholder="e.g. LD passes up the wall to LW. C swings through the middle."></textarea>
+      <button class="linkbtn" id="regen" type="button" hidden>↻ Rewrite it from my moves</button>
+    </div>
+    <button class="btn primary" id="saveStep" type="button" hidden>✓ Save step</button>
+    <button class="btn" id="saveStart" type="button" hidden>＋ Save as my starting position</button>
     <label class="ctl"><input type="checkbox" id="house"> Show the house &amp; shot lanes (defense plays)</label>
     <details class="box" id="playersBox"><summary>Player names &amp; jobs (optional)</summary>
       <div class="jobs" id="jobs"></div>
@@ -293,7 +308,8 @@
   try{ const m=location.hash.match(/p=([^&]+)/); if(m) D=decodePlay(m[1]); }catch(e){}
   if(!D) D=jget(K_CUR,null);
   if(!D||!D.steps) D=fresh(TPL['fo-dz-top'].pos,false,'fo-dz-top');
-  D.names=D.names||{}; D.jobs=D.jobs||{};
+  function norm(){ D.names=D.names||{}; D.jobs=D.jobs||{}; D.steps.forEach((st,i)=>{ if(i && st.cap && st.capEdited===undefined) st.capEdited=true; }); }
+  norm();
 
   // ---------- UI ----------
   function okToRestart(what){ return D.steps.length<2 || window.confirm('Start over from "'+what+'"? This clears your steps.'); }
@@ -315,21 +331,68 @@
         x.onclick=()=>{ if(!window.confirm('Delete the starting position "'+M[id].name+'" from this device?')) return; const A=starts(); delete A[id]; jset(K_START,A); if(D.start===id) D.start=''; buildStarts(); };
         w.appendChild(x); g.appendChild(w); }); }
   }
-  const PATHS=[['','Straight'],['rim','Along the boards'],['bank','Off the boards']];
+  const PATHS=[['','Straight','Straight'],['rim','Along the boards','Rim'],['bank','Off the boards','Bank']];
+  const PHINT={'':'Straight pass or carry.', rim:'The puck rims around the boards to where you drop it.', bank:'The puck bounces off the boards. Drag the orange ◆ to change where it hits.'};
   function buildPuckPath(){
-    const box=$('puckBox'); box.hidden = cur===0; if(cur===0) return;
-    const st=D.steps[cur], t=st.pk?st.pk.t:'', row=$('puckPath'); row.innerHTML='';
-    PATHS.forEach(([k,label])=>row.appendChild(chip(label,t===k,()=>{ st.pk=k?{t:k}:undefined; if(!st.pk) delete st.pk; buildPuckPath(); autosave(); })));
-    $('puckHint').textContent = t==='rim' ? 'The puck rims around the boards to where you drop it. Drag the puck to where it ends up.'
-      : t==='bank' ? 'The puck bounces off the boards. Drag the orange ◆ along the boards to change where it hits.'
-      : 'Rim it around the boards, or bank a pass off the wall.';
+    const bar=$('puckBar'); bar.hidden = cur===0 || prevT>=0; if(bar.hidden) return;
+    const st=D.steps[cur], t=st.pk?st.pk.t:''; [...bar.querySelectorAll('button')].forEach(b=>b.remove());
+    PATHS.forEach(([k,label,short])=>{ const b=document.createElement('button'); b.type='button'; b.innerHTML='<span class="l">'+label+'</span><span class="s">'+short+'</span>'; b.setAttribute('aria-label',label); b.title=PHINT[k]; b.setAttribute('aria-pressed',t===k);
+      b.onclick=()=>{ if(k) st.pk={t:k}; else delete st.pk; if(moved(cur)) st.dirty=true; autoCap(); buildPuckPath(); refreshSave(); autosave(); say(PHINT[k]); }; bar.appendChild(b); });
   }
+  function refreshSave(){
+    const st=D.steps[cur];
+    $('saveStep').hidden = !(cur>0 && st.dirty && moved(cur)); $('saveStep').textContent='✓ Save step '+cur;
+    $('saveStart').hidden = !(cur===0 && D.setMoved);
+    $('capHint').hidden = !(cur>0 && moved(cur) && !st.capEdited); $('regen').hidden = !(cur>0 && moved(cur) && st.capEdited);
+    [...$('steps').children].forEach((c,i)=>c.classList.toggle('draft', i>0 && !!D.steps[i].dirty));
+  }
+  // ---------- automatic step description ----------
+  const THEIRS={OC:'their C',OLW:'their LW',ORW:'their RW',OD1:'their D',OD2:'their D'};
+  function whoIs(k){ if(k==='G') return nameOf('G')||'the goalie'; if(THEIRS[k]) return THEIRS[k]; const n=nameOf(k); return n?n+' ('+k+')':k; }
+  function spot(p){ const x=p[0], y=p[1], side=y<42.5?'strong-side':'weak-side', mid=y>=28&&y<=57;
+    if(x<11) return 'behind our net';
+    if(x<75){
+      if(x<30&&(y<22||y>63)) return 'the '+side+' corner';
+      if(y<14||y>71) return x<52?'the '+side+' half-wall':'the '+side+' wall at our blue line';
+      if(x<22&&y>=30&&y<=55) return 'the front of our net';
+      if(x<45&&y>=24&&y<=61) return 'the slot';
+      if(x<62) return mid?'the high slot':'the top of the '+side+' circle';
+      return mid?'the middle at our blue line':'the '+side+' side at our blue line';
+    }
+    if(x<100) return mid?'the middle of the neutral zone':'the '+side+' side of the neutral zone';
+    return 'center ice and beyond';
+  }
+  const to=w=>w==='behind our net'?w:'to '+w;
+  const at=w=>w==='behind our net'?w:(/corner|slot|neutral|middle|center/.test(w)?'in ':'at ')+w;
+  function holder(pos,p,r){ let best=null, bd=r; ORDER.forEach(k=>{ if(k==='puck') return; const d=dist(pos[k],p); if(d<bd){ bd=d; best=k; } }); return best; }
+  function describe(i){
+    if(i<1) return ''; const a=D.steps[i-1].pos, b=D.steps[i].pos, pk=D.steps[i].pk, out=[], skip=new Set();
+    if(dist(a.puck,b.puck)>3){
+      const faceoff = i===1 && dist(a.C,a.puck)<6 && dist(a.OC,a.puck)<6;
+      let g=faceoff?null:holder(a,a.puck,5.5); const r=holder(b,b.puck,6.5), where=spot(b.puck);
+      const how = pk&&pk.t==='rim' ? ' around the boards' : pk&&pk.t==='bank' ? ' off the boards' : '';
+      if(faceoff){ const us=!r||r[0]!=='O'; out.push((us?whoIs('C'):'their C')+' wins the draw'+(r&&r!=='C'&&r!=='OC'?how+' to '+whoIs(r)+' '+at(where):how+' '+to(where))); skip.add('C'); if(r) skip.add(r); }
+      else if(g&&r&&g===r){ out.push(whoIs(g)+' carries the puck '+to(where)); skip.add(g); }
+      else if(g&&r){ out.push(whoIs(g)+(how?(pk.t==='rim'?' rims it':' banks it')+how:' passes')+' to '+whoIs(r)+' '+at(where)); skip.add(g); skip.add(r); }
+      else if(g){ out.push(whoIs(g)+(how?(pk.t==='rim'?' rims the puck':' banks the puck')+how:' moves the puck')+' '+to(where)); skip.add(g); }
+      else if(r){ out.push('The puck goes'+how+' '+to(where)+' and '+whoIs(r)+' gets it'); skip.add(r); }
+      else out.push('The puck goes'+how+' '+to(where));
+    }
+    const moves=k=>dist(a[k],b[k]);
+    const verb=k=>{ const dx=b[k][0]-a[k][0]; return dx>12?' skates up ':dx<-12?' drops back ':' moves '; };
+    OURS.filter(k=>!skip.has(k)&&moves(k)>4).sort((p,q)=>moves(q)-moves(p)).slice(0,3).forEach(k=>out.push(whoIs(k)+verb(k)+to(spot(b[k]))));
+    const them=THEM.filter(k=>!skip.has(k)&&moves(k)>6).sort((p,q)=>moves(q)-moves(p))[0]; if(them) out.push(whoIs(them)+verb(them)+to(spot(b[them])));
+    let txt=''; out.forEach(s=>{ s=s.charAt(0).toUpperCase()+s.slice(1)+'.'; if((txt+' '+s).trim().length<=220) txt=(txt+' '+s).trim(); });
+    return txt;
+  }
+  function moved(i){ if(i<1) return false; const a=D.steps[i-1].pos, b=D.steps[i].pos; return ORDER.some(k=>dist(a[k],b[k])>1); }
+  function autoCap(){ const st=D.steps[cur]; if(cur>0 && !st.capEdited){ st.cap=describe(cur); $('cap').value=st.cap; } }
   function showBanner(){ $('stage').classList.toggle('placing',placing); if(placing && prevT<0){ $('banner').textContent='Tap where the puck starts'; $('banner').className='banner show'; } else if(prevT<0) $('banner').className='banner'; }
   $('saveStart').onclick=()=>{
     const nm=window.prompt('Name this starting position (e.g. "Their dump-in, left corner"):', D.start&&starts()[D.start]?starts()[D.start].name:'');
     if(nm===null) return; const name=nm.trim().slice(0,30); if(!name){ say('Give it a name so you can find it later.'); return; }
     const A=starts(); let id=Object.keys(A).find(k=>A[k].name.toLowerCase()===name.toLowerCase()) || ('s'+Date.now());
-    A[id]={name, saved:Date.now(), house:!!D.house, pos:clone(D.steps[0].pos)}; jset(K_START,A); D.start=id; buildStarts(); autosave();
+    A[id]={name, saved:Date.now(), house:!!D.house, pos:clone(D.steps[0].pos)}; jset(K_START,A); D.start=id; D.setMoved=false; buildStarts(); refreshSave(); autosave();
     say('Saved "'+name+'" under My starting positions (this device).'); };
   [...OURS,'G'].forEach(k=>{ const l=document.createElement('b'); l.textContent=k;
     const n=document.createElement('input'); n.id='nm-'+k; n.className='nm'; n.maxLength=14; n.placeholder=(k==='G'?'Goalie':'Player')+' name (optional)'; n.setAttribute('aria-label',k+' player name');
@@ -340,12 +403,12 @@
   function sync(){
     $('name').value=D.name||''; $('house').checked=!!D.house;
     OURS.forEach(k=>{ $('job-'+k).value=D.jobs[k]||''; }); [...OURS,'G'].forEach(k=>{ $('nm-'+k).value=D.names[k]||''; });
-    buildStarts(); buildPuckPath(); $('saveStart').hidden = cur!==0; showBanner();
+    buildStarts(); buildPuckPath(); showBanner();
     const st=$('steps'); st.innerHTML='';
     D.steps.forEach((s,i)=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=i===0?'Set':String(i); b.setAttribute('aria-pressed',i===cur); b.onclick=()=>{ cur=i; prevT=-1; sync(); }; st.appendChild(b); });
     $('delStep').disabled = cur===0;
     $('capLabel').textContent = cur===0 ? 'Setup note (before the play starts)' : 'What happens in step '+cur;
-    $('cap').value=D.steps[cur].cap||'';
+    $('cap').value=D.steps[cur].cap||''; refreshSave();
     const L=lib(), sl=$('lib'); sl.innerHTML=''; const keys=Object.keys(L).sort((a,b)=>L[b].saved-L[a].saved);
     if(!keys.length){ const o=document.createElement('option'); o.textContent='No saved plays yet'; o.value=''; sl.appendChild(o); }
     keys.forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=(L[k].play.name||'Untitled')+' ('+(L[k].play.steps.length-1)+' steps)'; sl.appendChild(o); });
@@ -353,8 +416,13 @@
   }
   $('name').oninput=e=>{ D.name=e.target.value; autosave(); };
   $('house').onchange=e=>{ D.house=e.target.checked; autosave(); };
-  $('cap').oninput=e=>{ D.steps[cur].cap=e.target.value; autosave(); };
-  $('addStep').onclick=()=>{ if(D.steps.length>=9){ say('Nine steps max: keep plays short for 10U.'); return; } D.steps.splice(cur+1,0,{pos:clone(D.steps[cur].pos),cap:''}); cur++; prevT=-1; sync(); say('Step '+cur+' added. Drag players to where they end up.'); };
+  $('cap').oninput=e=>{ const st=D.steps[cur]; st.cap=e.target.value; if(cur>0){ st.capEdited=true; if(moved(cur)) st.dirty=true; } refreshSave(); autosave(); };
+  $('regen').onclick=()=>{ const st=D.steps[cur]; st.capEdited=false; autoCap(); st.dirty=true; refreshSave(); autosave(); };
+  $('saveStep').onclick=()=>{ const st=D.steps[cur]; if(!(st.cap||'').trim()){ st.cap=describe(cur); $('cap').value=st.cap; }
+    st.dirty=false; refreshSave(); autosave(); say('Step '+cur+' saved. Press + Add step for the next move, or ▶ Preview.'); };
+  $('addStep').onclick=()=>{ if(D.steps.length>=9){ say('Nine steps max: keep plays short for 10U.'); return; }
+    if(D.steps[cur]) D.steps[cur].dirty=false; // moving on keeps the step
+    D.steps.splice(cur+1,0,{pos:clone(D.steps[cur].pos),cap:'',dirty:true}); cur++; prevT=-1; sync(); say('Step '+cur+' added. Drag players and the puck to where they end up.'); };
   $('delStep').onclick=()=>{ if(cur===0) return; D.steps.splice(cur,1); cur=Math.min(cur,D.steps.length-1); sync(); };
   $('newBtn').onclick=()=>{ if(D.steps.length>1 && !window.confirm('Start a new play? Unsaved changes to this one will be lost.')) return; D=fresh(TPL['fo-dz-top'].pos,false,'fo-dz-top'); cur=0; placing=false; sync(); say('New play.'); };
   function link(){ const base=location.href.split('/designer')[0]; return base+'/play/#p='+encodePlay(D); }
@@ -362,9 +430,9 @@
   $('test').onclick=()=>{ if(ready()) window.open(link(),'_blank'); };
   $('copy').onclick=()=>{ if(!ready()) return; const u=link(); (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>say('Share link copied. Paste it in a text or email.'),()=>{ window.prompt('Copy this link:',u); }); };
   $('save').onclick=()=>{ const L=lib(); const id=D._id||('p'+Date.now()); D._id=id; L[id]={saved:Date.now(),play:clone(D)}; setLib(L); sync(); say('Saved on this device as "'+(D.name||'Untitled')+'".'); };
-  $('load').onclick=()=>{ const id=$('lib').value, L=lib(); if(!id||!L[id]) return; D=clone(L[id].play); D.names=D.names||{}; D.jobs=D.jobs||{}; cur=0; sync(); say('Opened "'+(D.name||'Untitled')+'".'); };
+  $('load').onclick=()=>{ const id=$('lib').value, L=lib(); if(!id||!L[id]) return; D=clone(L[id].play); norm(); cur=0; sync(); say('Opened "'+(D.name||'Untitled')+'".'); };
   $('del').onclick=()=>{ const id=$('lib').value, L=lib(); if(!id||!L[id]) return; if(!window.confirm('Delete "'+(L[id].play.name||'Untitled')+'" from this device?')) return; delete L[id]; setLib(L); sync(); say('Deleted.'); };
-  $('preview').onclick=()=>{ if(!ready()) return; placing=false; buildStarts(); prevT=0; say(''); };
+  $('preview').onclick=()=>{ if(!ready()) return; placing=false; buildStarts(); prevT=0; buildPuckPath(); say(''); };
 
   // ---------- drawing ----------
   function rrect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
@@ -463,12 +531,14 @@
   stage.addEventListener('pointerdown',ev=>{ if(prevT>=0) return;
     if(placing){ ev.preventDefault(); const p=toRink(ev); if(p[0]<1||p[0]>133||p[1]<1||p[1]>84) return;
       const x=clamp(p[0],3,131), y=clamp(p[1],3,82);
-      if(useStart(lineup(x,y),D.house,'')) say('Players lined up around the puck. Drag anyone to fix it up, then Save this setup as a starting position if you\'ll use it again.');
+      if(useStart(lineup(x,y),D.house,'')){ D.setMoved=true; refreshSave(); say('Players lined up around the puck. Drag anyone to fix it up. Press + Save as my starting position if you\'ll use it again.'); }
       else { placing=false; buildStarts(); } showBanner(); return; }
     const k=pick(toRink(ev)); if(k){ drag=k; stage.classList.add('dragging'); stage.setPointerCapture(ev.pointerId); ev.preventDefault(); } });
   stage.addEventListener('pointermove',ev=>{ if(!drag) return; const p=toRink(ev);
     if(drag==='bounce'){ D.steps[cur].pk.b=projBoard(p).pt.map(v=>Math.round(v*2)/2); return; } D.steps[cur].pos[drag]=[clamp(Math.round(p[0]*2)/2,1,133),clamp(Math.round(p[1]*2)/2,1,84)]; });
-  const end=()=>{ if(drag){ drag=null; stage.classList.remove('dragging'); autosave(); } };
+  const end=()=>{ if(drag){ drag=null; stage.classList.remove('dragging');
+      if(cur===0) D.setMoved=true; else { D.steps[cur].dirty=true; autoCap(); }
+      refreshSave(); autosave(); } };
   stage.addEventListener('pointerup',end); stage.addEventListener('pointercancel',end);
 
   function drawAll(pos,{ghost=null,arrows=null,cap=''}={}){
@@ -501,7 +571,7 @@
       const nb=D.steps[Math.min(i+1,D.steps.length-1)], via=i+1<D.steps.length?puckVia(a.puck,b.puck,nb.pk):[]; if(via.length) pos.puck=along([a.puck,...via,b.puck],e);
       drawAll(pos);
       const si=Math.min(i+1,D.steps.length-1); $('banner').textContent=(D.steps[si].cap||('Step '+si)); $('banner').className='banner show';
-      if(prevT>total){ prevT=-1; $('banner').className='banner'; showBanner(); }
+      if(prevT>total){ prevT=-1; $('banner').className='banner'; showBanner(); buildPuckPath(); }
     } else {
       drawAll(D.steps[cur].pos, cur>0?{ghost:D.steps[cur-1].pos, arrows:D.steps[cur-1].pos}:{});
       if(placing) DOTS.forEach(([,,d])=>{ ctx.save(); ctx.strokeStyle='rgba(215,38,61,.55)'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.arc(X(d[0]),Y(d[1]),3.2*S,0,7); ctx.stroke(); ctx.restore(); });
