@@ -93,7 +93,7 @@
 </style>
 </head>
 <body>
-<div id="ver" aria-label="Site version 2" style="position:fixed;top:3px;right:8px;z-index:10000;font:600 11px/1 Barlow,'Segoe UI',Arial,sans-serif;color:#8c98a6;pointer-events:none;letter-spacing:.3px">v2</div>
+<div id="ver" aria-label="Site version 3" style="position:fixed;top:3px;right:8px;z-index:10000;font:600 11px/1 Barlow,'Segoe UI',Arial,sans-serif;color:#8c98a6;pointer-events:none;letter-spacing:.3px">v3</div>
 
 
 <div class="app">
@@ -271,6 +271,8 @@
   function projBoard(p){ let best={d:1e9}; for(let i=1;i<BOARD.length;i++){ const a=BOARD[i-1], b=BOARD[i], dx=b[0]-a[0], dy=b[1]-a[1], l2=dx*dx+dy*dy||1;
       const t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2)), q=[a[0]+dx*t,a[1]+dy*t], d=Math.hypot(p[0]-q[0],p[1]-q[1]);
       if(d<best.d) best={d, pt:q, s:BL[i-1]+t*Math.sqrt(l2)}; } return best; }
+  function boardAt(s){ s=Math.max(0,Math.min(BL[BL.length-1],s)); let i=1; while(i<BL.length-1&&BL[i]<s) i++; const u=(s-BL[i-1])/((BL[i]-BL[i-1])||1);
+    return [BOARD[i-1][0]+(BOARD[i][0]-BOARD[i-1][0])*u, BOARD[i-1][1]+(BOARD[i][1]-BOARD[i-1][1])*u]; }
   function bankDefault(a,b){ // where a pass off the boards hits: mirror the target across the nearest wall
     const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2; let hit;
     if(mx<16){ const bx=2*BW-b[0], t=(BW-a[0])/((bx-a[0])||-1e-6); hit=[BW, a[1]+t*(b[1]-a[1])]; }
@@ -281,10 +283,11 @@
   function puckVia(a,b,pk){ // waypoints the puck passes through between a and b
     if(!pk) return [];
     if(pk.t==='bank') return [pk.b||bankDefault(a,b)];
-    if(pk.t==='rim'){ const pa=projBoard(a), pb=projBoard(b), out=[];
-      if(pa.d>1) out.push(pa.pt);
-      const lo=Math.min(pa.s,pb.s), hi=Math.max(pa.s,pb.s), mid=[]; for(let i=0;i<BOARD.length;i++) if(BL[i]>lo+.5&&BL[i]<hi-.5) mid.push(BOARD[i]);
-      if(pa.s>pb.s) mid.reverse(); out.push(...mid); if(pb.d>1) out.push(pb.pt); return out; }
+    if(pk.t==='rim'){ // shot in at an angle, then it follows the boards (the only place the puck curves)
+      const pa=projBoard(a), pb=projBoard(b), dir=pb.s>=pa.s?1:-1, out=[];
+      let s0=pa.s; if(pa.d>1.5){ s0=pa.s+dir*Math.min(10,Math.abs(pb.s-pa.s)/3); out.push(boardAt(s0)); }
+      const lo=Math.min(s0,pb.s), hi=Math.max(s0,pb.s), mid=[]; for(let i=0;i<BOARD.length;i++) if(BL[i]>lo+.5&&BL[i]<hi-.5) mid.push(BOARD[i]);
+      if(dir<0) mid.reverse(); out.push(...mid); if(pb.d>1) out.push(pb.pt); return out; }
     return [];
   }
   function polyLen(pts){ let L=0; for(let i=1;i<pts.length;i++) L+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); return L; }

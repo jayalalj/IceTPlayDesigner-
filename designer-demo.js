@@ -17,7 +17,7 @@
   var PL2=withP(PL,{ LD:[40,50] });
   var OURS=['C','LW','RW','LD','RD'], THEM=['OC','OLW','ORW','OD1','OD2'];
   // the rim: up to the boards, around the corner, behind the net, around the other corner, out to RW
-  var RIM=(function(){ var P=[[25,9],[24,2.5]], i, a;
+  var RIM=(function(){ var P=[[25,9]], i, a;
     for(i=1;i<=10;i++){ a=-Math.PI/2-i*Math.PI/20; P.push([24+21.5*Math.cos(a),24+21.5*Math.sin(a)]); }
     for(i=0;i<=10;i++){ a=Math.PI-i*Math.PI/20; P.push([24+21.5*Math.cos(a),61+21.5*Math.sin(a)]); }
     P.push([38,82.5],[38,79]); return P; })();
