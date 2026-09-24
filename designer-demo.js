@@ -12,6 +12,9 @@
   function withP(base,over){ var o={}; for(var k in base) o[k]=base[k]; for(var j in over) o[j]=over[j]; return o; }
   var S1=withP(S0,{ puck:[25,9] });
   var S2=withP(S1,{ RW:[40,74], puck:[38,79] });
+  // bonus: a starting position made by placing the puck on the weak-side wall
+  var PL={ G:[13,42.5], C:[46.5,70], OC:[53.5,70], RW:[48,83], OLW:[54,83], RD:[37,65], LD:[48,54], ORW:[54,54], LW:[48,45], OD2:[70,74.5], OD1:[70,36.5], puck:[50,70] };
+  var PL2=withP(PL,{ LD:[40,50] });
   var OURS=['C','LW','RW','LD','RD'], THEM=['OC','OLW','ORW','OD1','OD2'];
   // the rim: up to the boards, around the corner, behind the net, around the other corner, out to RW
   var RIM=(function(){ var P=[[25,9],[24,2.5]], i, a;
@@ -35,20 +38,23 @@
   function rk(p){ return [RX(p[0]),RY(p[1])]; }
 
   // ---------- timeline ----------
-  var LEN=38, RIMT=[15.8,19.0];
+  var LEN=46, RIMT=[15.8,19.0];
   var CUR=[ // [t, x, y] cursor keyframes
     [0,520,300],[1.2].concat(mid(P.faceoff)),[2.6,700,109],[5.8].concat(mid(P.add)),
     [6.9].concat(rk(S0.puck)),[7.0].concat(rk(S0.puck)),[8.2].concat(rk(S1.puck)),[8.3].concat(rk(S1.puck)),
     [9.5,905,338],[11.7].concat(mid(P.save)),[13.3].concat(mid(P.add)),
     [14.1].concat(rk(S1.RW)),[14.2].concat(rk(S1.RW)),[15.3].concat(rk(S2.RW)),[15.4].concat(rk(S2.RW)),
     [15.75].concat(rk(S1.puck)),[15.8].concat(rk(S1.puck)),[19.0].concat(rk(S2.puck)),[19.2].concat(rk(S2.puck)),
-    [20.2,470,455],[21.7].concat(mid(P.save)),[23.5].concat(mid(P.preview)),[30.1].concat(mid(P.test)),[33.1].concat(mid(P.copy)),[38,560,300] ];
-  var CLICKS=[1.3,2.7,5.9,7.0,9.6,11.8,13.4,14.2,15.8,21.8,23.6,30.2,33.2];
+    [20.2,470,455],[21.7].concat(mid(P.save)),[23.5].concat(mid(P.preview)),[30.1].concat(mid(P.test)),[33.1].concat(mid(P.copy)),
+    [34.6,760,120],[36.2].concat(mid(P.dzone)),[37.7].concat(rk(PL.puck)),[38.5].concat(rk(PL.LD)),[38.6].concat(rk(PL.LD)),[39.6].concat(rk(PL2.LD)),[39.7].concat(rk(PL2.LD)),
+    [40.9].concat(mid(P.save)),[42.4,880,330],[42.9,880,330],[46,560,300] ];
+  var CLICKS=[1.3,2.7,5.9,7.0,9.6,11.8,13.4,14.2,15.8,21.8,23.6,30.2,33.2,36.3,37.8,38.6,41.0,43.0];
   var DRAGS=[ // [start, end, entity]
-    [7.0,8.2,'puck'],[14.2,15.3,'RW'] ];
+    [7.0,8.2,'puck'],[14.2,15.3,'RW'],[38.6,39.6,'LD'] ];
   var SCENES=[[0,'1 · Pick a faceoff dot'],[2.4,'2 · Name the play'],[5.2,'3 · Add a step'],[6.4,'4 · Drag the puck to where it ends up'],
     [8.4,'5 · The description writes itself. Edit it if you like'],[10.9,'6 · Save the step'],[12.6,'Add the next step'],
-    [15.6,'7 · Slide the puck along the boards = a rim'],[20.6,'Save step 2'],[22.8,'8 · Preview it'],[29.4,'9 · Test it, then copy the share link']];
+    [15.6,'7 · Slide the puck along the boards = a rim'],[20.6,'Save step 2'],[22.8,'8 · Preview it'],[29.4,'9 · Test it, then copy the share link'],
+    [35.0,'Bonus · 📍 Place puck anywhere'],[37.9,'Players line up around it. Drag to fix it up'],[39.8,'Save it as your own starting position']];
   function typed(txt,t0,t1,t){ if(t<t0) return ''; return txt.slice(0,Math.round(clamp((t-t0)/(t1-t0),0,1)*txt.length)); }
 
   function cursorAt(t){
@@ -78,14 +84,22 @@
     if(t>=RIMT[1]+0.1){ s.cap=CAP2; s.capHint=true; s.flash=clamp(1-(t-19.1)/1.2,0,1); if(t<21.8) s.save='✓ Save step 2'; }
     if(t>=RIMT[1]+0.1&&t<21.8) s.toast='You slid the puck along the boards, so it\'s a rim.';
     if(t>=21.8&&t<23.4) s.toast='Step 2 saved.';
-    DRAGS.forEach(function(d){ if(t>=d[0]&&t<d[1]){ var q=withP(s.players,{}); q[d[2]]=toRink(s.cursor); s.players=q; s.dragging=d[2]; } });
+    DRAGS.forEach(function(d){ if(t>=d[0]&&t<d[1]&&s.players){ var q=withP(s.players,{}); q[d[2]]=toRink(s.cursor); s.players=q; s.dragging=d[2]; } });
     // preview
     if(t>=23.6&&t<29.4){ s.ghost=null; s.bar=false; s.rim=null; var tt=t-23.8;
       if(tt<0) s.players=S0; else if(tt<1.4){ s.players=lerpPos(S0,S1,ease(tt/1.4)); s.banner=CAP1+CAP1B; }
       else if(tt<4.2){ var e2=ease((tt-1.4)/2.8); s.players=lerpPos(S1,S2,e2); s.players.puck=along(RIM,e2); s.banner=CAP2; }
       else { s.players=S2; s.banner=CAP2; } }
     if(t>=30.3&&t<33) s.toast='Test it opens the play the way the team sees it: Watch, Play it, grading.';
-    if(t>=33.3) s.toast='Link copied! Paste it into an email or the team chat.';
+    if(t>=33.3&&t<35.5) s.toast='Link copied! Paste it into an email or the team chat.';
+    // bonus: place the puck anywhere
+    if(t>=36.3){ s.tpl=false; s.steps=1; s.step=0; s.ghost=null; s.bar=false; s.rim=null; s.trail=null; s.path=''; s.cap=''; s.capLabel='Lineup note'; s.capHint=false; s.flash=0; s.draft=[]; s.save=null; s.toast=''; s.name='Win it, rim it out';
+      if(t<37.8){ s.placing=true; s.banner='Tap where the puck starts'; s.players=S2; s.dim=true; }
+      else { s.players=withP(t>=39.6?PL2:PL,{}); s.mine=t>=43.0;
+        if(t<39.7) s.toast='Players lined up around the puck. Drag anyone to fix it up.';
+        if(t>=39.7&&t<41.0) s.saveStart=true;
+        if(t>=41.0&&t<43.0) s.modal=typed('Weak-side wall draw',41.3,42.5,t);
+        if(t>=43.0) s.toast='Saved "Weak-side wall draw" under My starting positions. Pick it any time.'; } }
     CLICKS.forEach(function(c){ if(t>=c&&t<c+.35) s.click={p:s.cursor,k:(t-c)/.35}; });
     if(t>=23.6&&t<24) s.pressed='preview'; if(t>=30.2&&t<30.6) s.pressed='test'; if(t>=33.2&&t<33.6) s.pressed='copy';
     if(t>=5.9&&t<6.3||t>=13.4&&t<13.8) s.pressed='add';
@@ -122,7 +136,7 @@
       for(var j in s.players){ if(j==='puck'&&(s.rim||s.trail)) continue; arrow(c,s.ghost[j],s.players[j], j[0]==='O'?'#8c98a6':'#15202b', j==='puck'?2.4:1.8, j!=='puck'); }
       if(s.rim){ c.save(); c.strokeStyle='#15202b'; c.lineWidth=2.4; c.lineJoin='round'; c.beginPath(); s.rim.forEach(function(p,i){ i?c.lineTo(RX(p[0]),RY(p[1])):c.moveTo(RX(p[0]),RY(p[1])); }); c.stroke(); c.restore(); arrow(c,s.rim[s.rim.length-3],s.rim[s.rim.length-1],'#15202b',2.4,false); } }
     if(s.trail&&s.trail.length>1){ c.save(); c.strokeStyle='rgba(31,111,208,.75)'; c.lineWidth=3; c.lineCap='round'; c.setLineDash([2,7]); c.beginPath(); s.trail.forEach(function(p,i){ i?c.lineTo(RX(p[0]),RY(p[1])):c.moveTo(RX(p[0]),RY(p[1])); }); c.stroke(); c.restore(); }
-    c.save(); c.globalAlpha=fade;
+    c.save(); c.globalAlpha=s.dim?fade*.25:fade;
     THEM.forEach(function(k){ player(c,s.players[k],'#c6cfd9','X',{ink:'#4a5561',stroke:'#8c98a6'}); });
     player(c,s.players.G,'#23395b','G',{r:2.6});
     OURS.forEach(function(k){ player(c,s.players[k],k[1]==='D'?'#23395b':'#e8641b',k,{hot:s.dragging===k}); });
@@ -146,23 +160,28 @@
     c.fillStyle='#f2f5f8'; c.fillRect(646,0,W-646,H);
     c.fillStyle='#15202b'; c.font='800 24px '+FONT; c.textAlign='left'; c.textBaseline='alphabetic'; c.fillText('PLAY DESIGNER',662,64);
     label(c,662,89,'Play name'); field(c,P.name,s.name,s.t>=2.7&&s.t<5.2,'e.g. Win to LW');
-    label(c,662,143,'Starting position · faceoff dot'); btn(c,P.faceoff,'Our end ↑','chip',s.tpl); btn(c,P.breakout,'Our end ↓','chip'); btn(c,P.dzone,'📍 Place puck','chip');
-    label(c,662,197,'Play timeline'); btn(c,P.set,'Lineup','chip',s.step===0); c.fillStyle='#5b6673'; c.font='700 14px '+FONT; c.textAlign='center'; c.textBaseline='middle'; if(s.steps>1) c.fillText('→',735,215); if(s.steps>2) c.fillText('→',781,215); if(s.steps>1) btn(c,P.s1,'1','chip',s.step===1); if(s.steps>2) btn(c,P.s2,'2','chip',s.step===2);
+    label(c,662,143,'Starting position · faceoff dot'); btn(c,P.faceoff,'Our end ↑','chip',s.tpl); btn(c,P.breakout,'Our end ↓','chip'); btn(c,P.dzone,'📍 Place puck',s.placing?'red':'chip');
+    if(s.mine){ c.save(); rr(c,662,176,150,16,8); c.fillStyle='#15202b'; c.fill(); c.fillStyle='#fff'; c.font='700 10.5px '+FONT; c.textAlign='center'; c.textBaseline='middle'; c.fillText('★ WEAK-SIDE WALL DRAW',737,184.5); c.restore(); }
+    label(c,662,s.mine?200:197,'Play timeline'); btn(c,P.set,'Lineup','chip',s.step===0); c.fillStyle='#5b6673'; c.font='700 14px '+FONT; c.textAlign='center'; c.textBaseline='middle'; if(s.steps>1) c.fillText('→',735,215); if(s.steps>2) c.fillText('→',781,215); if(s.steps>1) btn(c,P.s1,'1','chip',s.step===1); if(s.steps>2) btn(c,P.s2,'2','chip',s.step===2);
     s.draft.forEach(function(n){ var r=n===1?P.s1:P.s2; c.save(); rr(c,r[0]-1,r[1]-1,r[2]+2,r[3]+2,14); c.strokeStyle='#d7263d'; c.lineWidth=2.5; c.stroke(); c.restore(); });
     btn(c,P.add,s.pressed==='add'?'+ Add step ✓':'+ Add step','plain'); btn(c,P.del,'Delete step','plain');
     label(c,662,284,s.capLabel); if(s.capHint){ c.fillStyle='#5b6673'; c.font='italic 11.5px '+BODY; c.textAlign='left'; c.fillText('Written for you from your moves. Change anything.',662,296); }
     field(c,P.cap,s.cap,(s.t>=9.6&&s.t<10.9),'What happens in this step…');
     if(s.flash>0){ c.save(); rr(c,P.cap[0],P.cap[1],P.cap[2],P.cap[3],7); c.fillStyle='rgba(255,212,0,'+(0.35*s.flash)+')'; c.fill(); c.restore(); }
     if(s.save) btn(c,P.save,s.save,'red');
-    btn(c,P.preview,'▶ Preview','dark'); btn(c,P.test,'Test it','red'); btn(c,P.copy,s.pressed==='copy'||s.t>=30.8?'Link copied ✓':'Copy share link','plain');
+    if(s.saveStart) btn(c,P.save,'＋ Save as my starting position','plain');
+    btn(c,P.preview,'▶ Preview','dark'); btn(c,P.test,'Test it','red'); btn(c,P.copy,s.pressed==='copy'||(s.t>=33.3&&s.t<35.5)?'Link copied ✓':'Copy share link','plain');
     if(s.toast){ c.fillStyle='#1a9e5c'; c.font='600 13px '+BODY; c.textAlign='left'; var words=s.toast.split(' '), line='', y=484; words.forEach(function(w){ var tl=line?line+' '+w:w; if(c.measureText(tl).width>276){ c.fillText(line,662,y); line=w; y+=17; } else line=tl; }); c.fillText(line,662,y); }
   }
+  function modal(c,s){ if(s.modal==null) return; c.save(); c.fillStyle='rgba(10,15,20,.35)'; c.fillRect(0,0,W,H);
+    rr(c,672,262,256,112,10); c.fillStyle='#fff'; c.fill(); c.fillStyle='#15202b'; c.font='700 14px '+BODY; c.textAlign='left'; c.textBaseline='alphabetic'; c.fillText('Name this starting position:',686,288);
+    field(c,[686,298,228,30],s.modal,true,''); btn(c,[846,338,68,26],'OK','red'); c.restore(); }
   function cursor(c,s){ var p=s.cursor;
     if(s.click){ c.save(); c.beginPath(); c.arc(p[0],p[1],8+22*s.click.k,0,7); c.strokeStyle='rgba(215,38,61,'+(1-s.click.k)+')'; c.lineWidth=3; c.stroke(); c.restore(); }
     c.save(); c.translate(p[0],p[1]); c.beginPath(); c.moveTo(0,0); c.lineTo(0,22); c.lineTo(6,17); c.lineTo(10,26); c.lineTo(14,24); c.lineTo(10,15); c.lineTo(17,15); c.closePath();
     c.fillStyle= s.dragging?'#d7263d':'#15202b'; c.fill(); c.strokeStyle='#fff'; c.lineWidth=2; c.stroke(); c.restore(); }
   function caption(c,s){ c.fillStyle='#15202b'; c.fillRect(0,H-44,646,44); c.fillStyle='#fff'; c.font='800 21px '+FONT; c.textAlign='left'; c.textBaseline='middle'; c.fillText(s.scene.toUpperCase(),18,H-22); }
-  function frame(c,t){ c.clearRect(0,0,W,H); c.fillStyle='#fff'; c.fillRect(0,0,646,H); var s=state(t); scene(c,s); caption(c,s); panel(c,s); cursor(c,s);
+  function frame(c,t){ c.clearRect(0,0,W,H); c.fillStyle='#fff'; c.fillRect(0,0,646,H); var s=state(t); scene(c,s); caption(c,s); panel(c,s); modal(c,s); cursor(c,s);
     if(t>LEN-0.6){ c.fillStyle='rgba(255,255,255,'+clamp((t-(LEN-0.6))/0.6,0,1)+')'; c.fillRect(0,0,W,H); } }
 
   // ---------- widget ----------
@@ -174,7 +193,7 @@
       '.icet-demo button.ghost{background:#fff;color:#15202b;border:1px solid #d5dde6}'+
       '.icet-demo input[type=range]{flex:1;accent-color:#d7263d}'+
       '.icet-demo button:focus-visible,.icet-demo input:focus-visible{outline:3px solid #1f6fd0;outline-offset:2px}</style>'+
-      '<canvas width="'+W+'" height="'+H+'" role="img" aria-label="Animated demo of the Play Designer: pick a faceoff dot, name the play, add a step, drag the puck, the description writes itself, save the step, slide the puck along the boards to make a rim, preview, test and share."></canvas>'+
+      '<canvas width="'+W+'" height="'+H+'" role="img" aria-label="Animated demo of the Play Designer: pick a faceoff dot, name the play, add a step, drag the puck, the description writes itself, save the step, slide the puck along the boards to make a rim, preview, test and share, then place the puck anywhere to make and save your own starting position."></canvas>'+
       '<div class="bar"><button type="button" data-a="play">❚❚ Pause</button><button type="button" class="ghost" data-a="replay">↺ Replay</button><input type="range" min="0" max="'+LEN+'" step="0.1" value="0" aria-label="Demo position"><span data-a="time">0:00</span></div>';
     el.appendChild(wrap);
     var cv=wrap.querySelector('canvas'), c=cv.getContext('2d'), pb=wrap.querySelector('[data-a=play]'), rg=wrap.querySelector('input'), tm=wrap.querySelector('[data-a=time]');
